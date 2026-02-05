@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # ==================== CoreDNS - DNS 劫持 ====================
+  coredns:
+    image: coredns/coredns:1.11.1
+    container_name: sentinel-coredns
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    volumes:
+      - ./coredns:/etc/coredns:ro
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+    command: ["-conf", "/etc/coredns/Corefile"]
+    healthcheck:
+      test: ["CMD", "dig", "@127.0.0.1", "coredns.io"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== Nginx/OpenResty - WAF 网关 ====================
+  nginx:
+    image: openresty/openresty:alpine-fat
+    container_name: sentinel-nginx
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./nginx:/etc/nginx:ro
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/lua:/etc/nginx/lua:ro
+    networks:
+      - sentinel-net
+    depends_on:
+      - coredns
+      - sentinel-api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== Sentinel-AI API - 业务逻辑 ====================
+  sentinel-api:
+    build:
+      context: ./sentinel-api
+      dockerfile: Dockerfile
+    image: sentinel-ai-api:latest
+    container_name: sentinel-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - sentinel-net
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== etcd (可选）- 动态 DNS 管理 ====================
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: sentinel-etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - sentinel-net
+    volumes:
+      - ./etcd-data:/etcd
+    command: ["/usr/local/bin/etcd", "--listen-client-urls", "http://0.0.0.0:2379"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2379/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  sentinel-net:
+    driver: bridge
+    ipam:
+      config: - 10.0.0.0/24
+      - 10.0.0.255/24
+    dns:
+        nameservers:
+          - sentinel-coredns
+
+volumes:
+  coredns:
+  etcd-data:
+  nginx:
+    nginx/lua:
+  logs:

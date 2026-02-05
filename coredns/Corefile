@@ -1,0 +1,78 @@
+# CoreDNS 配置文件
+# Sentinel-AI DNS 劫持方案
+
+# 域: example.com
+example.com:53 {
+    # 方式 1: 使用文件存储（简单）
+    file {
+        # 域名数据库文件
+        zonefile /etc/coredns/example.com.db
+    }
+    
+    # 方式 2: 使用 etcd（动态，推荐生产）
+    # etcd {
+    #     path /skydns
+    #     endpoint http://etcd:2379
+    #     fallthrough
+    # }
+    
+    # 日志
+    log
+    
+    # 错误处理
+    errors
+}
+
+# 通配符（所有域名都劫持到 Sentinel-AI WAF）
+. {
+    # hosts 文件（静态映射）
+    hosts {
+        # 所有业务域名都指向 Nginx WAF
+        10.0.0.1  api.example.com
+        10.0.0.1  db.example.com
+        10.0.0.1  auth.example.com
+        10.0.0.1  cache.example.com
+        10.0.0.1  queue.example.com
+        
+        # 开发环境
+        10.0.0.1  api.dev.example.com
+        10.0.0.1  db.dev.example.com
+        
+        # 生产环境（通过 WAF 保护）
+        10.0.0.1  api.prod.example.com
+        10.0.0.1  db.prod.example.com
+    }
+    
+    # 日志
+    log
+    
+    # 错误处理
+    errors
+}
+
+# 域名数据库文件
+example.com. {
+    origin api.example.com
+    ns ns1.example.com (10.0.0.1)
+    ns ns2.example.com (10.0.0.1)
+    
+    # API 服务
+    api A 10.0.0.1
+    api A 10.0.0.1
+    
+    # 数据库服务
+    db A 10.0.0.1
+    database A 10.0.0.1
+    
+    # 认证服务
+    auth A 10.0.0.1
+    identity A 10.0.0.1
+    
+    # 缓存服务
+    cache A 10.0.0.1
+    redis A 10.0.0.1
+    
+    # 队列服务
+    queue A 10.0.0.1
+    rabbitmq A 10.0.0.1
+}

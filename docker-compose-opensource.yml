@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # CoreDNS - DNS 劫持
+  coredns:
+    image: coredns/coredns:1.11.1
+    container_name: coredns
+    ports:
+      - "53:53/udp"
+      - "53:53/tcp"
+    volumes:
+      - ./coredns:/etc/coredns:ro
+    networks:
+      - sentinel-net
+    command: -conf /etc/coredns/Corefile
+    restart: unless-stopped
+
+  # Nginx/OpenResty - WAF 网关
+  nginx:
+    image: openresty/openresty:alpine-fat
+    container_name: nginx-waf
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./nginx:/etc/nginx:ro
+      - ./nginx/lua:/etc/nginx/lua:ro
+    depends_on:
+      - coredns
+      - sentinel-api
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Sentinel-AI API - 业务逻辑
+  sentinel-api:
+    build: ./sentinel-api
+    container_name: sentinel-api
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./logs:/app/logs
+
+  # etcd - 可选，用于动态 DNS 配置
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: etcd
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_MAX_REQUEST_BYTES=10485760
+    networks:
+      - sentinel-net
+    command: etcd --listen-client-urls http://0.0.0.0:2379 --advertise-client-urls http://0.0.0.0:2379
+    restart: unless-stopped
+    profiles:
+      - etcd
+
+networks:
+  sentinel-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.0.0/16
+
+volumes:
+  logs:
+    driver: local
