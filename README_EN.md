@@ -1,4 +1,4 @@
-# Diting
+# Diting (谛听)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -7,13 +7,17 @@
 
 **Enterprise-grade AI Agent Zero-Trust Governance Platform**
 
-[中文文档](README_CN.md) | [Quick Start](QUICKSTART.md) | [Documentation](docs/)
+**谛听** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil.
+
+[中文文档](README.md) | [Quick Start](QUICKSTART.md) | [Documentation](docs/)
 
 ---
 
 ## 🎯 Overview
 
-Diting is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
+Diting (谛听) is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
+
+Just like the mythical creature Diting that serves as the mount of Ksitigarbha Bodhisattva and can discern truth from lies, this platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
 
 ### Key Features
 
@@ -58,7 +62,7 @@ Diting is an enterprise-grade AI security governance platform that builds a zero
 │  └───────────────────────────────────────────────────┘     │
 │                                                              │
 │  ┌───────────────────────────────────────────────────┐     │
-│  │      Diting Business Logic (Python/Go)       │     │
+│  │      Diting Business Logic (Python/Go)            │     │
 │  │  - OpenAI intent analysis                          │     │
 │  │  - Risk assessment                                 │     │
 │  │  - Approval workflow                               │     │
@@ -251,13 +255,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Contact
 
 - GitHub Issues: [https://github.com/hulk-yin/diting/issues](https://github.com/hulk-yin/diting/issues)
-- Email: [INSERT YOUR EMAIL]
 
 ---
 
 ## 🌟 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=hulk-yin/diting&type=Date)](https://star-history.com/#hulk-yin/diting&Date)
+
+---
+
+## 🐉 About the Name
+
+**Diting (谛听)** is a divine creature in Chinese Buddhist mythology, known as the mount of Ksitigarbha Bodhisattva. It possesses the supernatural ability to distinguish truth from falsehood, good from evil, and can hear all sounds in the world. This perfectly embodies our platform's mission: to discern and govern AI agent behaviors with wisdom and precision.
 
 ---
 
