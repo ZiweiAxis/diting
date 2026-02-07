@@ -1,297 +1,273 @@
-# Sentinel-AI 企业级智能体零信任治理平台
+# Diting (谛听)
 
-## 🎯 项目概述
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/dl/)
+[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
-Sentinel-AI（哨兵）是一个企业级 AI 安全治理平台，使用开源工具构建零信任架构，让 AI Agent 安全、可控、合规地运行。
+**Enterprise-grade AI Agent Zero-Trust Governance Platform**
 
-### 核心特性
+**谛听** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil.
 
-- ✅ **完全透明** - Agent 无需修改，无感知
-- ✅ **无法绕过** - DNS 劫持 + 网络层拦截
-- ✅ **AI 驱动** - OpenAI 意图分析，智能决策
-- ✅ **全链路审计** - 每个操作可追溯，满足合规要求
-- ✅ **人机协同** - 高风险操作人工审批
-- ✅ **开源工具** - 基于 CoreDNS + Nginx/OpenResty，稳定可靠
+[中文文档](README_CN.md) | [Quick Start](QUICKSTART.md)
 
 ---
 
-## 🏗️ 架构
+## 🎯 Overview
 
-### 三层治理架构
+Diting (谛听) is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
+
+Just like the mythical creature Diting that serves as the mount of Ksitigarbha Bodhisattva and can discern truth from lies, this platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
+
+### Key Features
+
+- ✅ **Fully Transparent** - No agent modification required, zero intrusion
+- ✅ **Unbypassable** - DNS hijacking + network-layer interception
+- ✅ **AI-Driven** - OpenAI intent analysis with intelligent decision-making
+- ✅ **Full Audit Trail** - Every operation is traceable for compliance
+- ✅ **Human-in-the-Loop** - Manual approval for high-risk operations
+- ✅ **Open Source Stack** - Built on CoreDNS + Nginx/OpenResty
+
+---
+
+## 🏗️ Architecture
+
+### Three-Layer Governance Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        Agent 应用层                      │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐ │
-│  │  LangChain   │  │  AutoGPT     │  │  OpenClaw    │ │
-│  └──────────────┘  └──────────────┘  └──────────────┘ │
-└────────────────────────┬─────────────────────────────────────────────┘
-                         │
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  数据面 - 拦截层                         │
-│                                                           │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │              DNS 劫持（CoreDNS）            │   │
-│  │  ┌─────────────────────────────────────────────┐    │   │
-│  │  │  api.example.com → 10.0.0.1        │    │   │
-│  │  │  db.example.com → 10.0.0.1         │    │   │
-│  │  └─────────────────────────────────────────────┘    │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                           │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │        Nginx/OpenResty 网关（Lua）      │   │
-│  │                                                 │   │
-│  │  ┌──────────────────────────────────────┐      │   │
-│  │  │  Lua 脚本：调用 Sentinel-AI API    │   │   │
-│  │  │  - 请求分析                            │   │   │
-│  │  │  - 决策执行                            │   │   │
-│  │  │  - 缓存管理                            │   │   │
-│  │  └──────────────────────────────────────┘      │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                           │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │        Sentinel-AI 业务逻辑（Python）        │   │
-│  │                                                 │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────┐  │   │
-│  │  │ OpenAI   │  │ 风险评估  │  │ 审批 │  │   │
-│  │  │ 意图分析 │  │          │  │      │  │   │
-│  │  └──────────┘  └──────────┘  └──────┘  │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                           │
-└────────────────────────┬─────────────────────────────────────────────┘
+│                     Agent Application Layer                  │
+│                                                              │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
+│  │  LangChain   │  │  AutoGPT     │  │  OpenClaw    │    │
+│  └──────────────┘  └──────────────┘  └──────────────┘    │
+└────────────────────────┬────────────────────────────────────┘
                          │
         ┌────────────────┼────────────────┐
         │                │                │
         ▼                ▼                ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  控制面 - 决策层                        │
-│                                                           │
-│  1. OpenAI 意图分析 → 操作意图                 │
-│  2. 规则引擎评估 → 风险分数                     │
-│  3. 综合评分 → 决策（ALLOW/REVIEW/BLOCK）  │
-│  4. 审批工作流 → 人工确认（可选）            │
-└─────────────────────────────────────────────────────────────┘
-                         │
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  记录面 - 审计层                         │
-│                                                           │
-│  - 全链路日志（JSONL）                                │
-│  - 证据链存储                                        │
-│  - 白盒解释界面                                        │
-│  - 合规报告                                            │
+│                  Data Plane - Interception Layer             │
+│                                                              │
+│  ┌───────────────────────────────────────────────────┐     │
+│  │         DNS Hijacking (CoreDNS)                   │     │
+│  │  api.example.com → 10.0.0.1 (WAF Gateway)        │     │
+│  └───────────────────────────────────────────────────┘     │
+│                                                              │
+│  ┌───────────────────────────────────────────────────┐     │
+│  │      Nginx/OpenResty Gateway (Lua)                │     │
+│  │  - Request analysis                                │     │
+│  │  - Decision execution                              │     │
+│  │  - Cache management                                │     │
+│  └───────────────────────────────────────────────────┘     │
+│                                                              │
+│  ┌───────────────────────────────────────────────────┐     │
+│  │      Diting Business Logic (Python/Go)            │     │
+│  │  - OpenAI intent analysis                          │     │
+│  │  - Risk assessment                                 │     │
+│  │  - Approval workflow                               │     │
+│  └───────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 文件结构
+## 🚀 Quick Start
 
-```
-E:\workspace\sentinel-ai\
-│
-├── 📚 文档
-│   ├── README.md                              # 项目总览
-│   ├── QUICKSTART.md                          # 5 分钟快速开始
-│   ├── DEPLOYMENT_OPENSOURCE.md               # 开源方案部署指南
-│   ├── WSL_PODMAN_DEPLOY.md                  # WSL/Podman 部署指南
-│   └── ...
-│
-├── 🔧 配置文件
-│   ├── .env.example                           # 环境变量模板
-│   ├── coredns/Corefile                     # CoreDNS 配置
-│   └── nginx/
-│       ├── nginx.conf                        # Nginx 主配置
-│       └── lua/
-│           └── sentinel-waf.lua          # WAF Lua 脚本
-│
-├── 🐳 容器配置
-│   ├── docker-compose-opensource.yml         # Docker Compose 配置
-│   ├── docker-compose-wsl.yml              # WSL/Podman 配置
-│   └── sentinel-api/
-│       ├── Dockerfile                       # API 容器
-│       └── main.py                          # FastAPI 服务
-│
-├── 🚀 启动脚本
-│   ├── start-opensource.bat                # Docker Desktop 启动
-│   ├── start-wsl.bat                       # WSL 启动
-│   └── start-podman.bat                   # Podman 启动
-│
-└── 📊 项目统计
-    └── ~70 个文件，~35,000 行代码
-```
+### Prerequisites
 
----
+- Python 3.8+ or Go 1.21+
+- Docker (optional, for containerized deployment)
+- OpenAI API Key (or Ollama for local LLM)
 
-## 🚀 快速开始
+### Installation
 
-### 方式 1: Docker Desktop（推荐 Windows）
+#### Python Version (Recommended for Quick Start)
 
 ```bash
-# 1. 配置环境变量
-copy .env.example .env
-# 编辑 .env，设置你的 OPENAI_API_KEY
+# Clone the repository
+git clone https://github.com/hulk-yin/diting.git
+cd diting
 
-# 2. 启动服务
-start-opensource.bat
+# Install dependencies
+pip install -r requirements.txt
 
-# 3. 测试
-curl http://localhost:8080/health
+# Start the service
+python sentinel.py
 ```
 
-### 方式 2: WSL/Podman（推荐 Linux）
+#### Go Version (High Performance)
 
 ```bash
-# 1. 启动 Podman
-podman machine start
+# Clone the repository
+git clone https://github.com/hulk-yin/diting.git
+cd diting
 
-# 2. 创建配置
-mkdir -p ./etcd-data ./nginx/logs
-cp coredns/Corefile.example coredns/Corefile
+# Download dependencies
+go mod download
 
-# 3. 启动服务
-podman-compose -f docker-compose-wsl.yml up -d
-
-# 4. 测试
-curl http://localhost:8080/health
+# Run the service
+go run main.go
 ```
 
----
-
-## 📚 详细文档
-
-| 文档 | 说明 |
-|------|------|
-| [QUICKSTART.md](QUICKSTART.md) | 5 分钟快速开始指南 |
-| [DEPLOYMENT_OPENSOURCE.md](DEPLOYMENT_OPENSOURCE.md) | 开源方案完整部署指南 |
-| [WSL_PODMAN_DEPLOY.md](WSL_PODMAN_DEPLOY.md) | WSL/Podman 部署指南 |
-| [TEST.md](TEST.md) | 测试场景 |
-| [DEMO.md](DEMO.md) | 演示脚本 |
-
----
-
-## 🏛️ 三种部署方案
-
-| 方案 | 适用场景 | 优势 |
-|------|---------|------|
-| **Docker Desktop** | Windows | 简单一键启动 |
-| **WSL/Podman** | Linux | 容器化部署，高性能 |
-| **Kubernetes** | 生产环境 | 云原生，可扩展 |
-
----
-
-## 🎯 核心组件
-
-| 组件 | 开源项目 | 功能 |
-|------|---------|------|
-| **CoreDNS** | CoreDNS | DNS 劫持，CNCF 毕业 |
-| **Nginx** | Nginx | 反向代理，高性能 |
-| **OpenResty** | OpenResty | Lua 支持，灵活扩展 |
-| **OpenAI** | OpenAI | GPT-4o，意图分析 |
-
----
-
-## 📊 性能指标
-
-| 指标 | 数值 |
-|------|------|
-| 低风险请求延迟 | < 10ms |
-| 高风险请求延迟 | < 200ms（含 OpenAI 分析） |
-| 吞吐量 | > 2000 req/s |
-| 内存占用 | ~50MB (API 服务） |
-
----
-
-## 🔒 安全特性
-
-| 特性 | 说明 |
-|------|------|
-| **DNS 劫持** | 所有域名解析到 WAF，Agent 无法绕过 |
-| **OpenAI 分析** | 智能意图识别，准确率高 |
-| **规则引擎** | 快速拦截，低延迟 |
-| **人机协同** | 高风险操作需要审批 |
-| **全链审计** | 每个操作可追溯，满足合规要求 |
-| **零信任架构** | 默认拒绝，显式批准 |
-
----
-
-## 🎬 演示场景
-
-### 场景 1: 安全查询（自动放行）
+#### Docker Deployment
 
 ```bash
-curl http://api.example.com/api/users
+# Start all services
+docker-compose up -d
+
+# Or use the open-source stack
+docker-compose -f docker-compose-opensource.yml up -d
 ```
 
-**输出：**
-```
-[15:30:45] 收到请求
-  方法: GET
-  Host: api.example.com
-  URL: /api/users
-  风险等级: 🟢 LOW (0分)
-  决策: ✓ 自动放行
-  耗时: 15ms
-```
-
----
-
-### 场景 2: 危险删除（需要审批）
+### Testing
 
 ```bash
-curl -X DELETE http://api.example.com/api/users/123
-```
+# Safe request (auto-approved)
+curl http://localhost:8080/get
 
-**输出：**
-```
-[15:30:45] 收到请求
-  方法: DELETE
-  Host: api.example.com
-  URL: /api/users/123
-  风险等级: 🔴 HIGH (90分)
-  决策: ⚠️ 需要审批
-  
-  🤖 OpenAI 意图分析
-     意图: 删除用户数据
-     影响: 数据不可恢复
-     风险: 高
-     建议: 需要人工审批
+# Dangerous request (requires approval)
+curl -X DELETE http://localhost:8080/delete
 
-╔══════════════════════════════════════╗
-║              🚨 需要人工审批                  ║
-╚════════════════════════════════════╝
-
-是否批准此操作? (y/n): _
+# View audit logs
+cat logs/audit.jsonl
 ```
 
 ---
 
-## 📞 技术支持
+## 📦 Components
 
-- [GitHub Issues](https://github.com/openclaw/sentinel-ai/issues)
-- [Discord 社区](https://discord.com/invite/clawd)
-- [文档中心](https://docs.openclaw.ai)
-
----
-
-## 📝 版本历史
-
-- v1.0 (2026-02-05) - MVP 版本，基于开源工具
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **DNS Hijacking** | CoreDNS | Route all domains to WAF gateway |
+| **WAF Gateway** | Nginx/OpenResty | Reverse proxy with Lua scripting |
+| **Business Logic** | Python/Go | AI analysis + risk assessment |
+| **LLM** | OpenAI/Ollama | Intent analysis |
+| **Storage** | JSONL | Audit trail logging |
 
 ---
 
-**项目创建时间:** 2026-02-05
-**项目状态:** ✅ 完成度 95%
-**剩余工作:** 5% （测试和文档完善）
+## 💡 Core Features
+
+### 1. Intelligent Risk Assessment
+- HTTP method-based (GET safe, DELETE dangerous)
+- URL path-based (/delete, /remove, etc.)
+- Request body content analysis
+- Three-tier risk classification (low/medium/high)
+
+### 2. AI Intent Analysis
+- Integrated with OpenAI/Ollama
+- Automatic intent and impact analysis
+- Fallback to rule engine when LLM unavailable
+- Response time < 2 seconds
+
+### 3. Human Approval Workflow
+- Interactive CLI approval
+- Full context display
+- Approve/deny decisions
+- Extensible to enterprise messaging platforms
+
+### 4. Full Audit Trail
+- JSONL format logging
+- Complete request/response recording
+- Decision reasoning and approver tracking
+- Post-incident forensics support
+
+### 5. Zero-Intrusion Deployment
+- No agent code modification required
+- No backend API changes needed
+- Only DNS configuration required
 
 ---
 
-**下一步:** 运行 `start-opensource.bat` 或 `start-wsl.bat` 启动服务！
+## 📚 Documentation
+
+- [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
+- [Installation Guide](INSTALL.md) - Detailed deployment instructions
+- [Open Source Deployment](DEPLOYMENT_OPENSOURCE.md) - Deploy with open-source tools
+- [Architecture Guide](ARCHITECTURE_DNS_HIJACK.md) - DNS hijacking architecture
+- [eBPF Technical Guide](TECHNICAL_EBPF.md) - Kernel-level monitoring
+- [Testing Guide](TEST.md) - Test scenarios and cases
+- [Demo Script](DEMO.md) - Presentation guide
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute
+
+---
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+diting/
+├── main.go                 # Go implementation
+├── sentinel.py             # Python implementation
+├── sentinel_dns.py         # DNS hijacking module
+├── sentinel_ebpf.py        # eBPF monitoring module
+├── wafgateway.go           # WAF gateway
+├── coredns/                # CoreDNS configuration
+├── nginx/                  # Nginx/OpenResty configuration
+├── sentinel-api/           # API service
+├── logs/                   # Audit logs
+└── docs/                   # Documentation
+```
+
+### Running Tests
+
+```bash
+# Python
+python -m pytest
+
+# Go
+go test ./...
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [CoreDNS](https://coredns.io/) - DNS server
+- [OpenResty](https://openresty.org/) - Web platform
+- [OpenAI](https://openai.com/) - AI models
+- [Ollama](https://ollama.ai/) - Local LLM runtime
+
+---
+
+## 📞 Contact
+
+- GitHub Issues: [https://github.com/hulk-yin/diting/issues](https://github.com/hulk-yin/diting/issues)
+
+---
+
+## 🌟 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=hulk-yin/diting&type=Date)](https://star-history.com/#hulk-yin/diting&Date)
+
+---
+
+## 🐉 About the Name
+
+**Diting (谛听)** is a divine creature in Chinese Buddhist mythology, known as the mount of Ksitigarbha Bodhisattva. It possesses the supernatural ability to distinguish truth from falsehood, good from evil, and can hear all sounds in the world. This perfectly embodies our platform's mission: to discern and govern AI agent behaviors with wisdom and precision.
+
+---
+
+**Made with ❤️ by the Diting Team**
