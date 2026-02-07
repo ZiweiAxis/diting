@@ -23,8 +23,8 @@ We welcome feature suggestions! Please open an issue with:
 
 1. **Fork the repository**
    ```bash
-   git clone https://github.com/hulk-yin/sentinel-ai.git
-   cd sentinel-ai
+   git clone https://github.com/hulk-yin/diting.git
+   cd diting
    ```
 
 2. **Create a feature branch**
@@ -92,8 +92,8 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/hulk-yin/sentinel-ai.git
-   cd sentinel-ai
+   git clone https://github.com/hulk-yin/diting.git
+   cd diting
    ```
 
 2. **Install dependencies**

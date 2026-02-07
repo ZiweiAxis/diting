@@ -1,4 +1,4 @@
-# Sentinel-AI
+# Diting
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -13,7 +13,7 @@
 
 ## 🎯 Overview
 
-Sentinel-AI is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
+Diting is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
 
 ### Key Features
 
@@ -58,7 +58,7 @@ Sentinel-AI is an enterprise-grade AI security governance platform that builds a
 │  └───────────────────────────────────────────────────┘     │
 │                                                              │
 │  ┌───────────────────────────────────────────────────┐     │
-│  │      Sentinel-AI Business Logic (Python/Go)       │     │
+│  │      Diting Business Logic (Python/Go)       │     │
 │  │  - OpenAI intent analysis                          │     │
 │  │  - Risk assessment                                 │     │
 │  │  - Approval workflow                               │     │
@@ -82,8 +82,8 @@ Sentinel-AI is an enterprise-grade AI security governance platform that builds a
 
 ```bash
 # Clone the repository
-git clone https://github.com/hulk-yin/sentinel-ai.git
-cd sentinel-ai
+git clone https://github.com/hulk-yin/diting.git
+cd diting
 
 # Install dependencies
 pip install -r requirements.txt
@@ -96,8 +96,8 @@ python sentinel.py
 
 ```bash
 # Clone the repository
-git clone https://github.com/hulk-yin/sentinel-ai.git
-cd sentinel-ai
+git clone https://github.com/hulk-yin/diting.git
+cd diting
 
 # Download dependencies
 go mod download
@@ -194,7 +194,7 @@ cat logs/audit.jsonl
 ### Project Structure
 
 ```
-sentinel-ai/
+diting/
 ├── main.go                 # Go implementation
 ├── sentinel.py             # Python implementation
 ├── sentinel_dns.py         # DNS hijacking module
@@ -250,15 +250,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-- GitHub Issues: [https://github.com/hulk-yin/sentinel-ai/issues](https://github.com/hulk-yin/sentinel-ai/issues)
+- GitHub Issues: [https://github.com/hulk-yin/diting/issues](https://github.com/hulk-yin/diting/issues)
 - Email: [INSERT YOUR EMAIL]
 
 ---
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=hulk-yin/sentinel-ai&type=Date)](https://star-history.com/#hulk-yin/sentinel-ai&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=hulk-yin/diting&type=Date)](https://star-history.com/#hulk-yin/diting&Date)
 
 ---
 
-**Made with ❤️ by the Sentinel-AI Team**
+**Made with ❤️ by the Diting Team**
