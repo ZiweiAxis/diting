@@ -10,9 +10,9 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -152,13 +152,19 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
 		// 劫持连接
 		hijacker, ok := w.(http.Hijacker)
 		if !ok {
+			color.Red("  ✗ Hijacking 不支持")
 			http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+			audit.ResponseCode = 500
+			saveAuditLog(audit)
 			return
 		}
 
 		clientConn, _, err := hijacker.Hijack()
 		if err != nil {
+			color.Red("  ✗ Hijack 失败: %v", err)
 			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			audit.ResponseCode = 503
+			saveAuditLog(audit)
 			return
 		}
 		defer clientConn.Close()
@@ -167,6 +173,7 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
 		targetConn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
 		if err != nil {
 			color.Red("  ✗ 连接目标失败: %v", err)
+			clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
 			audit.ResponseCode = 502
 			saveAuditLog(audit)
 			return
@@ -174,11 +181,32 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
 		defer targetConn.Close()
 
 		// 返回 200 Connection Established
-		clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		if _, err := clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+			color.Red("  ✗ 写入响应失败: %v", err)
+			audit.ResponseCode = 500
+			saveAuditLog(audit)
+			return
+		}
 
-		// 双向转发数据
-		go io.Copy(targetConn, clientConn)
-		io.Copy(clientConn, targetConn)
+		// 双向转发数据（使用 WaitGroup 等待两个方向都完成）
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		// Client -> Target
+		go func() {
+			defer wg.Done()
+			io.Copy(targetConn, clientConn)
+			targetConn.(*net.TCPConn).CloseWrite()
+		}()
+
+		// Target -> Client
+		go func() {
+			defer wg.Done()
+			io.Copy(clientConn, targetConn)
+			clientConn.(*net.TCPConn).CloseWrite()
+		}()
+
+		wg.Wait()
 
 		audit.ResponseCode = 200
 	} else {
@@ -263,8 +291,8 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 		color.Green("\n  ✓ 请求已放行")
 
 		// 转发请求
-		proxyRequest(w, r)
-		audit.ResponseCode = 200
+		statusCode := proxyRequest(w, r)
+		audit.ResponseCode = statusCode
 	} else {
 		color.Red("\n  ✗ 请求已拒绝")
 		w.WriteHeader(http.StatusForbidden)
@@ -290,25 +318,45 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 	color.Cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 }
 
-// 转发 HTTP 请求
-func proxyRequest(w http.ResponseWriter, r *http.Request) {
+// 转发 HTTP 请求（返回状态码）
+func proxyRequest(w http.ResponseWriter, r *http.Request) int {
+	// 构建目标 URL
+	targetURL := r.URL.String()
+	
+	// 如果是代理请求，URL 已经是完整的
+	// 如果不是，需要从 Host 头构建
+	if !strings.HasPrefix(targetURL, "http") {
+		scheme := "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		targetURL = fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL.Path)
+		if r.URL.RawQuery != "" {
+			targetURL += "?" + r.URL.RawQuery
+		}
+	}
+
 	// 创建新的请求
-	targetURL := r.URL
-	if targetURL.Scheme == "" {
-		targetURL.Scheme = "http"
-	}
-	if targetURL.Host == "" {
-		targetURL.Host = r.Host
-	}
-
-	proxyReq, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
+	proxyReq, err := http.NewRequest(r.Method, targetURL, bytes.NewReader([]byte{}))
 	if err != nil {
+		color.Red("  ✗ 创建请求失败: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return 500
 	}
 
-	// 复制请求头
+	// 读取原始请求体
+	bodyBytes, _ := io.ReadAll(r.Body)
+	proxyReq.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// 复制请求头（排除 hop-by-hop 头）
 	for key, values := range r.Header {
+		// 跳过 hop-by-hop 头
+		if key == "Connection" || key == "Proxy-Connection" || 
+		   key == "Keep-Alive" || key == "Proxy-Authenticate" ||
+		   key == "Proxy-Authorization" || key == "Te" || 
+		   key == "Trailer" || key == "Transfer-Encoding" || key == "Upgrade" {
+			continue
+		}
 		for _, value := range values {
 			proxyReq.Header.Add(key, value)
 		}
@@ -319,14 +367,22 @@ func proxyRequest(w http.ResponseWriter, r *http.Request) {
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+		// 不自动跟随重定向
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
 	}
 
 	// 发送请求
 	resp, err := client.Do(proxyReq)
 	if err != nil {
+		color.Red("  ✗ 请求失败: %v", err)
 		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
+		return 502
 	}
 	defer resp.Body.Close()
 
@@ -342,14 +398,21 @@ func proxyRequest(w http.ResponseWriter, r *http.Request) {
 
 	// 复制响应体
 	io.Copy(w, resp.Body)
+
+	return resp.StatusCode
 }
 
 // HTTPS 风险评估
 func assessRiskHTTPS(host string) string {
 	hostLower := strings.ToLower(host)
+	
+	// 移除端口号
+	if idx := strings.Index(hostLower, ":"); idx != -1 {
+		hostLower = hostLower[:idx]
+	}
 
 	// 检查危险域名
-	dangerousDomains := []string{"malware", "phishing", "hack", "exploit"}
+	dangerousDomains := []string{"malware", "phishing", "hack", "exploit", "crack"}
 	for _, domain := range dangerousDomains {
 		if strings.Contains(hostLower, domain) {
 			return "高"
@@ -357,7 +420,10 @@ func assessRiskHTTPS(host string) string {
 	}
 
 	// 检查常见安全域名
-	safeDomains := []string{"google.com", "github.com", "microsoft.com", "apple.com"}
+	safeDomains := []string{
+		"google.com", "github.com", "microsoft.com", "apple.com",
+		"amazon.com", "cloudflare.com", "openai.com",
+	}
 	for _, domain := range safeDomains {
 		if strings.Contains(hostLower, domain) {
 			return "低"
@@ -536,7 +602,8 @@ func humanApproval(r *http.Request, analysis string) string {
 }
 
 func checkOllama() bool {
-	resp, err := http.Get(config.OllamaEndpoint + "/api/tags")
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(config.OllamaEndpoint + "/api/tags")
 	if err != nil {
 		return false
 	}
@@ -546,11 +613,12 @@ func checkOllama() bool {
 
 func saveAuditLog(audit AuditLog) {
 	// 简单的文件日志
-	logFile := "logs/audit.jsonl"
-	os.MkdirAll("logs", 0755)
+	logFile := "../../logs/audit.jsonl"
+	os.MkdirAll("../../logs", 0755)
 
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		log.Printf("保存审计日志失败: %v", err)
 		return
 	}
 	defer f.Close()
