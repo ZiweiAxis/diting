@@ -87,7 +87,7 @@ Just like the mythical creature Diting that serves as the mount of Ksitigarbha B
 ```bash
 # Clone the repository
 git clone https://github.com/hulk-yin/diting.git
-cd diting
+cd diting/python
 
 # Install dependencies
 pip install -r requirements.txt
@@ -101,7 +101,7 @@ python sentinel.py
 ```bash
 # Clone the repository
 git clone https://github.com/hulk-yin/diting.git
-cd diting
+cd diting/cmd/diting
 
 # Download dependencies
 go mod download
@@ -113,6 +113,8 @@ go run main.go
 #### Docker Deployment
 
 ```bash
+cd diting/deployments/docker
+
 # Start all services
 docker-compose up -d
 
@@ -182,13 +184,14 @@ cat logs/audit.jsonl
 
 ## 📚 Documentation
 
-- [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- [Installation Guide](INSTALL.md) - Detailed deployment instructions
-- [Open Source Deployment](DEPLOYMENT_OPENSOURCE.md) - Deploy with open-source tools
-- [Architecture Guide](ARCHITECTURE_DNS_HIJACK.md) - DNS hijacking architecture
-- [eBPF Technical Guide](TECHNICAL_EBPF.md) - Kernel-level monitoring
-- [Testing Guide](TEST.md) - Test scenarios and cases
-- [Demo Script](DEMO.md) - Presentation guide
+- [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
+- [Installation Guide](docs/INSTALL.md) - Detailed deployment instructions
+- [Project Structure](docs/STRUCTURE.md) - Architecture and organization
+- [Open Source Deployment](docs/DEPLOYMENT_OPENSOURCE.md) - Deploy with open-source tools
+- [Architecture Guide](docs/ARCHITECTURE_DNS_HIJACK.md) - DNS hijacking architecture
+- [eBPF Technical Guide](docs/TECHNICAL_EBPF.md) - Kernel-level monitoring
+- [Testing Guide](docs/TEST.md) - Test scenarios and cases
+- [Demo Script](docs/DEMO.md) - Presentation guide
 - [Contributing Guide](CONTRIBUTING.md) - How to contribute
 
 ---
@@ -199,17 +202,29 @@ cat logs/audit.jsonl
 
 ```
 diting/
-├── main.go                 # Go implementation
-├── sentinel.py             # Python implementation
-├── sentinel_dns.py         # DNS hijacking module
-├── sentinel_ebpf.py        # eBPF monitoring module
-├── wafgateway.go           # WAF gateway
-├── coredns/                # CoreDNS configuration
-├── nginx/                  # Nginx/OpenResty configuration
-├── sentinel-api/           # API service
-├── logs/                   # Audit logs
-└── docs/                   # Documentation
+├── python/                 # Python implementation
+│   ├── sentinel.py         # Main service
+│   ├── sentinel_dns.py     # DNS hijacking
+│   └── sentinel_ebpf.py    # eBPF monitoring
+│
+├── cmd/diting/             # Go main application
+│   └── main.go             # Entry point
+│
+├── pkg/                    # Go packages
+│   ├── dns/                # DNS hijacking
+│   ├── waf/                # WAF gateway
+│   └── ebpf/               # eBPF monitoring
+│
+├── deployments/            # Deployment configs
+│   ├── docker/             # Docker Compose
+│   ├── coredns/            # CoreDNS config
+│   └── nginx/              # Nginx config
+│
+├── docs/                   # Documentation
+└── scripts/                # Utility scripts
 ```
+
+See [STRUCTURE.md](docs/STRUCTURE.md) for detailed architecture.
 
 ### Running Tests
 

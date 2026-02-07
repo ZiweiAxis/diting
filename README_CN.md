@@ -199,17 +199,29 @@ cat logs/audit.jsonl
 
 ```
 diting/
-├── main.go                 # Go 实现
-├── sentinel.py             # Python 实现
-├── sentinel_dns.py         # DNS 劫持模块
-├── sentinel_ebpf.py        # eBPF 监控模块
-├── wafgateway.go           # WAF 网关
-├── coredns/                # CoreDNS 配置
-├── nginx/                  # Nginx/OpenResty 配置
-├── sentinel-api/           # API 服务
-├── logs/                   # 审计日志
-└── docs/                   # 文档
+├── python/                 # Python 实现
+│   ├── sentinel.py         # 主服务
+│   ├── sentinel_dns.py     # DNS 劫持
+│   └── sentinel_ebpf.py    # eBPF 监控
+│
+├── cmd/diting/             # Go 主应用
+│   └── main.go             # 入口点
+│
+├── pkg/                    # Go 包
+│   ├── dns/                # DNS 劫持
+│   ├── waf/                # WAF 网关
+│   └── ebpf/               # eBPF 监控
+│
+├── deployments/            # 部署配置
+│   ├── docker/             # Docker Compose
+│   ├── coredns/            # CoreDNS 配置
+│   └── nginx/              # Nginx 配置
+│
+├── docs/                   # 文档
+└── scripts/                # 工具脚本
 ```
+
+详细架构请查看 [STRUCTURE.md](docs/STRUCTURE.md)。
 
 ### 运行测试
 
