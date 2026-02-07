@@ -1,74 +1,73 @@
 # Diting (谛听)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/dl/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
 **Enterprise-grade AI Agent Zero-Trust Governance Platform**
 
-**谛听** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil.
+**谛听 (Diting)** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil. This platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
 
-[中文文档](README_CN.md) | [Quick Start](QUICKSTART.md)
+[中文文档](README_CN.md) | [Quick Start](#-quick-start)
 
 ---
 
 ## 🎯 Overview
 
-Diting (谛听) is an enterprise-grade AI security governance platform that builds a zero-trust architecture using open-source tools, enabling AI Agents to run securely, controllably, and compliantly.
-
-Just like the mythical creature Diting that serves as the mount of Ksitigarbha Bodhisattva and can discern truth from lies, this platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
+Diting is an enterprise-grade AI security governance platform that intercepts and governs AI Agent API calls through intelligent reverse proxy, enabling AI Agents to run securely, controllably, and compliantly.
 
 ### Key Features
 
-- ✅ **Fully Transparent** - No agent modification required, zero intrusion
-- ✅ **Unbypassable** - DNS hijacking + network-layer interception
-- ✅ **AI-Driven** - OpenAI intent analysis with intelligent decision-making
-- ✅ **Full Audit Trail** - Every operation is traceable for compliance
+- ✅ **Dynamic API Proxy** - Intercepts any external API calls from AI agents
+- ✅ **Zero Intrusion** - No agent code modification required
+- ✅ **AI-Driven Analysis** - OpenAI/Ollama intent analysis with intelligent decision-making
+- ✅ **Risk Assessment** - Three-tier risk classification (low/medium/high)
 - ✅ **Human-in-the-Loop** - Manual approval for high-risk operations
-- ✅ **Open Source Stack** - Built on CoreDNS + Nginx/OpenResty
+- ✅ **Full Audit Trail** - Every operation is traceable for compliance
+- ✅ **High Performance** - Built with Go, handles 2000+ req/s
 
 ---
 
 ## 🏗️ Architecture
 
-### Three-Layer Governance Architecture
+### Simple & Powerful
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Agent Application Layer                  │
-│                                                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  LangChain   │  │  AutoGPT     │  │  OpenClaw    │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘    │
-└────────────────────────┬────────────────────────────────────┘
-                         │
-        ┌────────────────┼────────────────┐
-        │                │                │
-        ▼                ▼                ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Data Plane - Interception Layer             │
-│                                                              │
-│  ┌───────────────────────────────────────────────────┐     │
-│  │         DNS Hijacking (CoreDNS)                   │     │
-│  │  api.example.com → 10.0.0.1 (WAF Gateway)        │     │
-│  └───────────────────────────────────────────────────┘     │
-│                                                              │
-│  ┌───────────────────────────────────────────────────┐     │
-│  │      Nginx/OpenResty Gateway (Lua)                │     │
-│  │  - Request analysis                                │     │
-│  │  - Decision execution                              │     │
-│  │  - Cache management                                │     │
-│  └───────────────────────────────────────────────────┘     │
-│                                                              │
-│  ┌───────────────────────────────────────────────────┐     │
-│  │      Diting Business Logic (Python/Go)            │     │
-│  │  - OpenAI intent analysis                          │     │
-│  │  - Risk assessment                                 │     │
-│  │  - Approval workflow                               │     │
-│  └───────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   AI Agent                               │
+│                                                          │
+│  requests.get('https://api.openai.com/chat')        │
+│  requests.post('https://api.github.com/repos')      │
+│  requests.delete('https://api.stripe.com/data')     │
+└────────────────┬─────────────────────────────────────────┘
+                 │
+                 │ All HTTP/HTTPS requests
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│              Diting Governance Gateway                   │
+│                                                          │
+│  1. Intercept all API calls                             │
+│  2. Risk assessment (method/path/content)               │
+│  3. AI intent analysis (Ollama/OpenAI)                  │
+│  4. Human approval (high-risk only)                     │
+│  5. Audit logging (full trail)                          │
+└────────────────┬─────────────────────────────────────────┘
+                 │
+                 │ Forward (if approved)
+                 ▼
+┌─────────────────────────────────────────────────────────┐
+│              External APIs                               │
+│                                                          │
+│  OpenAI, GitHub, Stripe, any SaaS APIs...           │
+└─────────────────────────────────────────────────────────┘
 ```
+
+**Why Go?**
+- Native support for dynamic reverse proxy
+- Automatic DNS resolution and connection pooling
+- Built-in HTTPS/TLS handling
+- High performance (2000+ req/s)
+- Single binary deployment
 
 ---
 
@@ -76,27 +75,13 @@ Just like the mythical creature Diting that serves as the mount of Ksitigarbha B
 
 ### Prerequisites
 
-- Python 3.8+ or Go 1.21+
+- Go 1.21+ (for building from source)
 - Docker (optional, for containerized deployment)
-- OpenAI API Key (or Ollama for local LLM)
+- Ollama (optional, for local LLM analysis)
 
 ### Installation
 
-#### Python Version (Recommended for Quick Start)
-
-```bash
-# Clone the repository
-git clone https://github.com/hulk-yin/diting.git
-cd diting/python
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the service
-python sentinel.py
-```
-
-#### Go Version (High Performance)
+#### Option 1: Run from Source
 
 ```bash
 # Clone the repository
@@ -110,21 +95,32 @@ go mod download
 go run main.go
 ```
 
-#### Docker Deployment
+#### Option 2: Build Binary
+
+```bash
+cd diting/cmd/diting
+
+# Build
+go build -o diting main.go
+
+# Run
+./diting
+```
+
+#### Option 3: Docker Deployment
 
 ```bash
 cd diting/deployments/docker
-
-# Start all services
 docker-compose up -d
-
-# Or use the open-source stack
-docker-compose -f docker-compose-opensource.yml up -d
 ```
 
 ### Testing
 
 ```bash
+# Configure your AI agent to use Diting as proxy
+export HTTP_PROXY=http://localhost:8080
+export HTTPS_PROXY=http://localhost:8080
+
 # Safe request (auto-approved)
 curl http://localhost:8080/get
 
@@ -137,48 +133,82 @@ cat logs/audit.jsonl
 
 ---
 
-## 📦 Components
+## 📦 Project Structure
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **DNS Hijacking** | CoreDNS | Route all domains to WAF gateway |
-| **WAF Gateway** | Nginx/OpenResty | Reverse proxy with Lua scripting |
-| **Business Logic** | Python/Go | AI analysis + risk assessment |
-| **LLM** | OpenAI/Ollama | Intent analysis |
-| **Storage** | JSONL | Audit trail logging |
+```
+diting/
+├── cmd/diting/             # Main application
+│   ├── main.go             # Entry point
+│   ├── go.mod              # Go module
+│   └── README.md
+│
+├── pkg/                    # Reusable packages (future)
+│   ├── dns/                # DNS utilities
+│   ├── waf/                # WAF utilities
+│   └── ebpf/               # eBPF monitoring (future)
+│
+├── deployments/            # Deployment configs
+│   ├── docker/             # Docker Compose
+│   └── kubernetes/         # K8s manifests (future)
+│
+├── docs/                   # Documentation
+│   ├── QUICKSTART.md
+│   ├── INSTALL.md
+│   └── ...
+│
+└── scripts/                # Utility scripts
+```
 
 ---
 
 ## 💡 Core Features
 
-### 1. Intelligent Risk Assessment
-- HTTP method-based (GET safe, DELETE dangerous)
-- URL path-based (/delete, /remove, etc.)
-- Request body content analysis
-- Three-tier risk classification (low/medium/high)
+### 1. Dynamic API Proxy
 
-### 2. AI Intent Analysis
-- Integrated with OpenAI/Ollama
+Unlike traditional reverse proxies (Nginx) that require fixed upstream configuration, Diting dynamically handles any external API:
+
+```go
+// Automatically handles any target
+requests.get('https://api.openai.com/chat')      // ✅ Works
+requests.post('https://api.github.com/repos')    // ✅ Works
+requests.delete('https://random-api.com/data')   // ✅ Works
+```
+
+### 2. Intelligent Risk Assessment
+
+- **HTTP Method**: GET (safe) vs DELETE (dangerous)
+- **URL Path**: `/delete`, `/remove`, `/drop` (high risk)
+- **Request Body**: Dangerous keywords detection
+- **Three-tier**: Low / Medium / High
+
+### 3. AI Intent Analysis
+
+- Integrated with Ollama (local LLM) or OpenAI
 - Automatic intent and impact analysis
 - Fallback to rule engine when LLM unavailable
 - Response time < 2 seconds
 
-### 3. Human Approval Workflow
-- Interactive CLI approval
-- Full context display
+### 4. Human Approval Workflow
+
+- Interactive CLI approval for high-risk operations
+- Full context display (method, path, analysis)
 - Approve/deny decisions
 - Extensible to enterprise messaging platforms
 
-### 4. Full Audit Trail
-- JSONL format logging
-- Complete request/response recording
-- Decision reasoning and approver tracking
-- Post-incident forensics support
+### 5. Full Audit Trail
 
-### 5. Zero-Intrusion Deployment
-- No agent code modification required
-- No backend API changes needed
-- Only DNS configuration required
+```json
+{
+  "timestamp": "2026-02-08T00:20:00Z",
+  "method": "DELETE",
+  "path": "/api/users/123",
+  "risk_level": "高",
+  "intent_analysis": "意图: 删除用户数据...",
+  "decision": "ALLOW",
+  "approver": "admin",
+  "duration_ms": 1850
+}
+```
 
 ---
 
@@ -186,10 +216,7 @@ cat logs/audit.jsonl
 
 - [Quick Start Guide](docs/QUICKSTART.md) - Get started in 5 minutes
 - [Installation Guide](docs/INSTALL.md) - Detailed deployment instructions
-- [Project Structure](docs/STRUCTURE.md) - Architecture and organization
-- [Open Source Deployment](docs/DEPLOYMENT_OPENSOURCE.md) - Deploy with open-source tools
-- [Architecture Guide](docs/ARCHITECTURE_DNS_HIJACK.md) - DNS hijacking architecture
-- [eBPF Technical Guide](docs/TECHNICAL_EBPF.md) - Kernel-level monitoring
+- [Architecture Guide](docs/ARCHITECTURE_DNS_HIJACK.md) - System architecture
 - [Testing Guide](docs/TEST.md) - Test scenarios and cases
 - [Demo Script](docs/DEMO.md) - Presentation guide
 - [Contributing Guide](CONTRIBUTING.md) - How to contribute
@@ -198,41 +225,29 @@ cat logs/audit.jsonl
 
 ## 🛠️ Development
 
-### Project Structure
+### Building
 
-```
-diting/
-├── python/                 # Python implementation
-│   ├── sentinel.py         # Main service
-│   ├── sentinel_dns.py     # DNS hijacking
-│   └── sentinel_ebpf.py    # eBPF monitoring
-│
-├── cmd/diting/             # Go main application
-│   └── main.go             # Entry point
-│
-├── pkg/                    # Go packages
-│   ├── dns/                # DNS hijacking
-│   ├── waf/                # WAF gateway
-│   └── ebpf/               # eBPF monitoring
-│
-├── deployments/            # Deployment configs
-│   ├── docker/             # Docker Compose
-│   ├── coredns/            # CoreDNS config
-│   └── nginx/              # Nginx config
-│
-├── docs/                   # Documentation
-└── scripts/                # Utility scripts
+```bash
+cd cmd/diting
+go build -o diting main.go
 ```
 
-See [STRUCTURE.md](docs/STRUCTURE.md) for detailed architecture.
+### Cross-compilation
+
+```bash
+# Linux
+GOOS=linux GOARCH=amd64 go build -o diting-linux main.go
+
+# Windows
+GOOS=windows GOARCH=amd64 go build -o diting.exe main.go
+
+# macOS
+GOOS=darwin GOARCH=amd64 go build -o diting-mac main.go
+```
 
 ### Running Tests
 
 ```bash
-# Python
-python -m pytest
-
-# Go
 go test ./...
 ```
 
@@ -260,10 +275,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- [CoreDNS](https://coredns.io/) - DNS server
-- [OpenResty](https://openresty.org/) - Web platform
-- [OpenAI](https://openai.com/) - AI models
+- [Go](https://golang.org/) - Programming language
 - [Ollama](https://ollama.ai/) - Local LLM runtime
+- [OpenAI](https://openai.com/) - AI models
 
 ---
 
