@@ -72,7 +72,7 @@ We welcome feature suggestions! Please open an issue with:
 
 ## Commit Message Convention
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+Use **English** for commit messages. We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 - `feat:` - New feature
 - `fix:` - Bug fix

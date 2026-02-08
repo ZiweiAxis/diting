@@ -62,7 +62,13 @@ cmd/diting/out_*.log
 
 # Built binaries (build with go build -o <name>)
 cmd/diting/diting
+cmd/diting/diting-ollama
 cmd/diting/diting_ws
 cmd/diting/diting_ws_fixed
 cmd/diting/diting_feishu
 cmd/diting/diting_*
+
+# Cursor / BMAD (IDE and workflow)
+.cursor/
+_bmad/
+_bmad-output/

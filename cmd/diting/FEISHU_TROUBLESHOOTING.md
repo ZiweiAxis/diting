@@ -1,72 +1,73 @@
-# 飞书收不到审批消息 - 排查说明
+# Not receiving Feishu approval messages – troubleshooting
 
-## 0. WebSocket 模式（你当前用的）
+## 0. WebSocket mode (if you use it)
 
-**若你用的是 WebSocket 长连接**（main_ws_fixed / main_feishu_chat / main_ws）：
+If you use **WebSocket** (main_ws_fixed / main_feishu_chat / main_ws):
 
-- 审批消息是发到**当前会话的 chat_id**（你给机器人发消息的那条会话），**不需要**填 `approval_user_id`。
-- 使用前**先给应用发一条消息**，终端会打印 `Chat ID` 和 `user_id`；之后触发高风险请求时，审批会发到该会话。
-- 若你已发过一条消息，只要 WebSocket 已连上，终端里应出现过「收到飞书消息」和对应的 **Chat ID**；下次高风险请求就会发到该会话。若仍收不到审批，请确认：① 飞书开放平台已开启「长连接」；② 当前运行的是 WebSocket 版（如 `./diting_ws_fixed`），不是 main。
+- Approval messages are sent to the **chat_id** of the current session (the chat where you messaged the bot). You **do not** need to set `approval_user_id`.
+- **Send one message to the app first**; the terminal will print `Chat ID` and `user_id`. After that, high-risk requests send approval to that chat.
+- If you already sent a message and WebSocket is connected, the terminal should have shown "received Feishu message" and the **Chat ID**. If you still do not get approval: (1) ensure Feishu open platform has "long connection" enabled; (2) ensure you are running the WebSocket binary (e.g. `./diting_ws_fixed`), not main.
 
-**从 WebSocket 拿到 user_id**：再给机器人发任意一条消息，终端会打印「发送者 user_id: xxx」，可复制用于 main 轮询模式。
+**Getting user_id from WebSocket**: Send any message to the bot again; the terminal prints "sender user_id: xxx", which you can use for main poll mode.
 
 ---
 
-## 1. ID 类型已修复（main）
+## 1. ID type (fixed in main)
 
-**原因**：配置里 `approval_user_id` 填的是 **open_id**（`ou_` 开头），但之前发消息用了 `receive_id_type=user_id`，类型不一致会导致发错或失败。
+**Cause**: `approval_user_id` was set to **open_id** (prefix `ou_`) but the code used `receive_id_type=user_id`, so the type did not match.
 
-**修改**：代码已改为根据前缀自动识别：
-- `ou_` 开头 → 使用 `receive_id_type=open_id`
-- 否则 → 使用 `receive_id_type=user_id`
+**Change**: The code now infers type from prefix:
+- `ou_` → `receive_id_type=open_id`
+- Otherwise → `receive_id_type=user_id`
 
-请重新编译并启动后再试：
+Rebuild and run:
+
 ```bash
 go build -o diting main.go && ./diting
 ```
 
-## 2. 飞书应用权限
+## 2. Feishu app permissions
 
-在 [飞书开放平台](https://open.feishu.cn/app) → 你的应用 → 权限管理，确认已开通并生效：
+In [Feishu Open Platform](https://open.feishu.cn/app) → your app → Permission management, ensure these are enabled and applied:
 
-| 权限 | 说明 |
-|------|------|
-| **im:message:send_as_bot** | 以应用身份发送单聊/群聊消息（发审批消息必需） |
-| **im:message:read_as_user**（若用轮询收回复） | 读取用户与应用的会话消息，用于轮询审批回复 |
+| Permission | Purpose |
+|------------|---------|
+| **im:message:send_as_bot** | Send DM/group messages as the app (required for approval messages) |
+| **im:message:read_as_user** (if using poll for replies) | Read user–app conversation for polling approval replies |
 
-发布/生效后，在「权限与范围」里确认已勾选并已让管理员生效。
+After publishing, confirm in "Permissions & scope" that they are checked and applied by admin.
 
-## 3. 用户是否与机器人有过会话
+## 3. User must have chatted with the bot
 
-部分飞书环境下，应用**先要和用户有过 1v1 会话**才能稳定发消息（用户曾在 IM 里点进过该应用或发过一条消息）。可让审批人在飞书里搜索该应用并发一条「hi」再试。
+In some setups, the app can send messages reliably only **after the user has had at least one 1v1 conversation** (user opened the app in IM or sent one message). Have the approver search for the app in Feishu and send "hi", then try again.
 
-## 4. 看网关日志
+## 4. Check gateway logs
 
-触发一次高风险请求后看终端：
+After triggering one high-risk request, check the terminal:
 
-- 若出现 `Approval request sent to Feishu, message_id=xxx` → 说明接口调用成功，消息应已发出；若仍收不到，多半是权限或会话问题（见上）。
-- 若出现 `Failed to send approval request: ...` → 看后面的错误信息（如 99991663 等），对照 [飞书错误码](https://open.feishu.cn/document/ukTMukTMukTM/ugjM14COyUjL4ITN) 排查。
+- If you see `Approval request sent to Feishu, message_id=xxx` → the API call succeeded; the message was sent. If the user still does not see it, check permissions or conversation (above).
+- If you see `Failed to send approval request: ...` → read the error (e.g. 99991663) and check [Feishu error codes](https://open.feishu.cn/document/ukTMukTMukTM/ugjM14COyUjL4ITN).
 
-## 5. 报错「open_id cross app」
+## 5. Error "open_id cross app"
 
-**原因**：`approval_user_id` 填的是**其他应用下的 open_id**。飞书规定：发消息时用的接收人 ID 必须是**当前应用**下的标识；open_id 按应用隔离，不能跨应用使用。
+**Cause**: `approval_user_id` is an **open_id from another app**. Feishu requires the recipient ID to be under **this app**; open_id is per-app and cannot be used across apps.
 
-**处理**：改为使用**本应用下该用户的 user_id**（不是 open_id）：
+**Fix**: Use the **user_id for this app** (not open_id):
 
-- **你已给应用发过一条消息时**：用本仓库自带工具打印 user_id：
+- **If the user has already sent a message to this app**: use the repo tool to print user_id:
   ```bash
   cd cmd/diting
   go run get_feishu_user_id.go
   ```
-  飞书开放平台 → 事件订阅 → 请求地址填 `http://你的公网地址/feishu/event`（本地可用 ngrok 暴露 9000 端口）。再给应用发一条消息，终端会打印 **user_id**，复制到 `config.json` 的 `feishu.approval_user_id`。
-- 或：在 [飞书管理后台](https://open.feishu.cn/app) → 你的应用 → 权限/通讯录 → 获取用户 user_id；
-- 或：调用飞书 API [通过手机号/邮箱获取 user_id](https://open.feishu.cn/document/server-docs/contact-v3/user/batch_get_id)。
+  In Feishu open platform → Event subscription → set request URL to `http://your-public-url/feishu/event` (e.g. expose port 9000 with ngrok). Send one message to the app; the terminal prints **user_id**. Copy it to `config.json` → `feishu.approval_user_id`.
+- Or: In [Feishu admin](https://open.feishu.cn/app) → your app → Directory/permissions → get user user_id;
+- Or: Use Feishu API to [get user_id by phone/email](https://open.feishu.cn/document/server-docs/contact-v3/user/batch_get_id).
 
-配置里填 **user_id** 后，代码会使用 `receive_id_type=user_id` 发送，即可正常发审批消息。
+After setting **user_id** in config, the code uses `receive_id_type=user_id` and approval messages work.
 
-## 6. 配置检查
+## 6. Config checklist
 
-`config.json` 里：
+In `config.json`:
 
-- `feishu.approval_user_id`：**推荐填 user_id**（本应用下），避免「open_id cross app」。不要填成 chat_id（`oc_xxx`）。
-- `feishu.enabled` 为 `true`。
+- `feishu.approval_user_id`: **use user_id** (for this app) to avoid "open_id cross app". Do not use chat_id (`oc_xxx`).
+- `feishu.enabled`: `true`.

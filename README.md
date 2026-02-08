@@ -221,8 +221,8 @@ requests.delete('https://random-api.com/data')   // ✅ Works
   "timestamp": "2026-02-08T00:20:00Z",
   "method": "DELETE",
   "path": "/api/users/123",
-  "risk_level": "高",
-  "intent_analysis": "意图: 删除用户数据...",
+  "risk_level": "high",
+  "intent_analysis": "Intent: delete user data...",
   "decision": "ALLOW",
   "approver": "admin",
   "duration_ms": 1850

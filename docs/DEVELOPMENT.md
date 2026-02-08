@@ -1,74 +1,74 @@
-# 项目开发规范 (Sentinel-AI / Diting)
+# Development Guide (Sentinel-AI / Diting)
 
-本文档约定仓库结构、推荐入口、代码与提交规范，便于协作与维护。
+This document defines repository layout, recommended entry points, and code/commit conventions for collaboration and maintenance.
 
 ---
 
-## 1. 仓库结构
+## 1. Repository structure
 
 ```
 sentinel-ai/
-├── cmd/diting/           # Diting 治理网关（主应用）
-│   ├── main.go           # 原始入口（Ollama，无飞书）
-│   ├── main.go           # 推荐：飞书审批（轮询 + chat_id 回退）
-│   ├── main_ws_fixed.go  # 飞书 WebSocket 长连接（需开放平台开启）
-│   ├── config.json       # 运行时配置（勿提交敏感信息）
+├── cmd/diting/           # Diting governance gateway (main app)
+│   ├── main.go           # Recommended: Feishu approval (poll + chat_id fallback)
+│   ├── main_ollama.go    # Ollama-only, no Feishu
+│   ├── main_ws_fixed.go  # Feishu WebSocket (requires Feishu "long connection")
+│   ├── config.json       # Runtime config (do not commit secrets)
 │   ├── go.mod, go.sum
-│   ├── QUICKSTART.md     # 快速启动（含推荐入口）
-│   └── FEISHU_*.md       # 飞书集成与排错
-├── pkg/                  # 可复用包（dns, waf 等）
-├── deployments/          # Docker / 部署配置
-├── docs/                 # 项目文档与规范
-├── scripts/              # 构建与测试脚本
-└── _bmad-output/         # BMAD 产出（阶段总结、验证清单等）
+│   ├── QUICKSTART.md     # Quick start (including recommended entry)
+│   └── FEISHU_*.md       # Feishu integration and troubleshooting
+├── pkg/                  # Reusable packages (dns, waf, etc.)
+├── deployments/          # Docker / deployment configs
+├── docs/                 # Project docs and norms
+├── scripts/              # Build and test scripts
+└── _bmad-output/         # BMAD outputs (phase summaries, checklists, etc.)
 ```
 
 ---
 
-## 2. 推荐入口与构建
+## 2. Recommended entry points and build
 
-| 场景           | 入口文件        | 构建产物      | 说明 |
-|----------------|-----------------|---------------|------|
-| 飞书审批（推荐） | `main.go`       | `diting`      | 轮询回复，支持 chat_id 回退，无需长连接 |
-| WebSocket 审批 | `main_ws_fixed.go` | `diting_ws_fixed` | 需飞书开放平台开启「长连接」 |
-| 无飞书         | `main.go`       | `diting`      | Ollama 意图分析，本地审批 |
+| Scenario              | Entry file        | Binary          | Notes |
+|-----------------------|-------------------|-----------------|-------|
+| Feishu approval       | `main.go`         | `diting`        | Poll for replies; chat_id fallback; no long connection |
+| WebSocket approval    | `main_ws_fixed.go`| `diting_ws_fixed` | Requires Feishu "long connection" |
+| No Feishu             | `main.go`         | `diting`        | Ollama intent analysis, local approval |
 
-- 构建：`go build -o diting main.go`（在 `cmd/diting` 下）。本目录存在多个 main 入口，须按单文件构建，例如：`go build -o diting-ollama main_ollama.go`。
-- 配置：见 `cmd/diting/QUICKSTART.md` 与 `config.json` 注释；敏感信息用环境变量或本地覆盖，勿提交密钥。
-
----
-
-## 3. Go 代码规范
-
-- 遵循官方 [Effective Go](https://go.dev/doc/effective_go) 与 `go fmt`。
-- 提交前执行：`go build ./...`、`go vet ./...`（若有测试则 `go test ./...`）。
-- 导出符号需有注释；新增 main_*.go 时在 README/QUICKSTART 中说明用途与推荐场景。
-- 第三方依赖：仅通过 `go mod` 管理，不提交 `vendor/`（除非项目明确要求）。
+- Build: `go build -o diting main.go` (from `cmd/diting`). This directory has multiple main packages; build by specifying the file, e.g. `go build -o diting-ollama main_ollama.go`.
+- Config: see `cmd/diting/QUICKSTART.md` and `config.json` comments; keep secrets in env or local overrides; do not commit keys.
 
 ---
 
-## 4. 飞书与审批相关
+## 3. Go code conventions
 
-- **配置**：`approval_user_id` 建议使用本应用下的 **user_id**（避免 open_id cross app）；若仅配置 `chat_id`，main 会在发用户失败时回退到 chat 发送并轮询该 chat。
-- **日志**：审批决策写入 `audit` 配置的 JSONL；可读性优先，便于 `query_audit.sh` 或后续分析。
-- **新增入口**：若新增 main_*.go，需在 QUICKSTART 或 FEISHU_TROUBLESHOOTING 中说明与推荐入口的差异。
-
----
-
-## 5. 提交与分支
-
-- **Commit**：采用 [Conventional Commits](https://www.conventionalcommits.org/)（如 `feat:`, `fix:`, `docs:`）。
-- **分支**：功能开发使用 `feature/xxx` 或 `fix/xxx`；主分支保持可构建、文档与推荐入口一致。
-- **提交前**：确认未提交二进制（如 `diting`）、本地日志、`config.json` 中的密钥；敏感配置使用 `.env` 或 `config.local.json` 并已加入 `.gitignore`。
+- Follow [Effective Go](https://go.dev/doc/effective_go) and `go fmt`.
+- Before commit: `go build ./...`, `go vet ./...` (and `go test ./...` if tests exist).
+- Exported symbols must have comments; when adding a new main_*.go, document purpose and recommended use in README/QUICKSTART.
+- Dependencies: managed via `go mod` only; do not commit `vendor/` unless required by the project.
 
 ---
 
-## 6. 文档与产出
+## 4. Feishu and approval
 
-- 用户面向：`README.md`、`README_CN.md`、`cmd/diting/QUICKSTART.md`。
-- 开发与排错：`CONTRIBUTING.md`、`docs/DEVELOPMENT.md`（本文档）、`cmd/diting/FEISHU_TROUBLESHOOTING.md`。
-- BMAD 阶段产出：`_bmad-output/` 下阶段总结、验证清单、下一步路线图；重要结论可同步到 `docs/` 或 `cmd/diting/DELIVERY.md`。
+- **Config**: Prefer **user_id** under this app for `approval_user_id` (avoids open_id cross-app). If only `chat_id` is set, main will fall back to sending to that chat and polling it when user send fails.
+- **Logging**: Approval decisions go to the audit JSONL; keep logs readable for `query_audit.sh` and later analysis.
+- **New entries**: If you add a main_*.go, document how it differs from the recommended entry in QUICKSTART or FEISHU_TROUBLESHOOTING.
 
 ---
 
-*最后更新：2026-02-08，与飞书审批验证通过后的仓库状态一致。*
+## 5. Commits and branches
+
+- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat:`, `fix:`, `docs:`). **Use English for commit messages.**
+- **Branches**: Use `feature/xxx` or `fix/xxx` for development; keep main buildable and docs aligned with the recommended entry.
+- **Before commit**: Ensure no binaries (e.g. `diting`), local logs, or keys in `config.json` are committed; use `.env` or `config.local.json` for secrets and keep them in `.gitignore`.
+
+---
+
+## 6. Documentation and artifacts
+
+- User-facing: `README.md`, `README_CN.md`, `cmd/diting/QUICKSTART.md`.
+- Development and troubleshooting: `CONTRIBUTING.md`, `docs/DEVELOPMENT.md` (this file), `cmd/diting/FEISHU_TROUBLESHOOTING.md`.
+- BMAD phase artifacts: `_bmad-output/` (summaries, checklists, roadmaps); sync important conclusions to `docs/` or `cmd/diting/DELIVERY.md`.
+
+---
+
+*Last updated: 2026-02-08, aligned with post–Feishu-approval validation.*
