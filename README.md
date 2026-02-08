@@ -8,7 +8,9 @@
 
 **谛听 (Diting)** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil. This platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
 
-[中文文档](README_CN.md) | [Quick Start](#-quick-start)
+**Status:** MVP / concept validation — suitable for trial and feedback; not yet production-ready.
+
+[中文文档](README_CN.md) | [Quick Start](#-quick-start) | [Security](SECURITY.md)
 
 ---
 
@@ -106,6 +108,23 @@ go build -o diting main.go
 # Run
 ./diting
 ```
+
+#### Option 2b: Feishu approval (recommended for human-in-the-loop)
+
+For high-risk operations with Feishu approval (no public URL or Feishu "long connection" required):
+
+```bash
+cd diting/cmd/diting
+
+# Build Feishu message-reply version
+go build -o diting main.go
+
+# Configure config.json (feishu.approval_user_id, use_message_reply: true, poll_interval_seconds)
+# Then run
+./diting
+```
+
+See **[cmd/diting/QUICKSTART.md](cmd/diting/QUICKSTART.md)** for config and minimal verification steps.
 
 #### Option 3: Docker Deployment
 

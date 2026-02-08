@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,630 +9,877 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
+	"github.com/google/uuid"
 )
 
-// 配置
+// ============================================================================
+// Configuration Structures
+// ============================================================================
+
 type Config struct {
-	ProxyListen        string
-	OllamaEndpoint     string
-	OllamaModel        string
-	DangerousMethods   []string
-	DangerousPaths     []string
-	AutoApproveMethods []string
+	Proxy ProxyConfig `json:"proxy"`
+	LLM   LLMConfig   `json:"llm"`
+	Feishu FeishuConfig `json:"feishu"`
+	Risk  RiskConfig  `json:"risk"`
+	Audit AuditConfig `json:"audit"`
 }
 
-var config = Config{
-	ProxyListen:        ":8080",
-	OllamaEndpoint:     "http://localhost:11434",
-	OllamaModel:        "qwen2.5:7b",
-	DangerousMethods:   []string{"DELETE", "PUT", "PATCH", "POST"},
-	DangerousPaths:     []string{"/delete", "/remove", "/drop", "/destroy", "/clear"},
-	AutoApproveMethods: []string{"GET", "HEAD", "OPTIONS"},
+type ProxyConfig struct {
+	Listen         string `json:"listen"`
+	TimeoutSeconds int    `json:"timeout_seconds"`
 }
 
-// 审计日志结构
-type AuditLog struct {
-	Timestamp      time.Time `json:"timestamp"`
-	Method         string    `json:"method"`
-	Host           string    `json:"host"`
-	Path           string    `json:"path"`
-	Body           string    `json:"body"`
-	RiskLevel      string    `json:"risk_level"`
-	IntentAnalysis string    `json:"intent_analysis"`
-	Decision       string    `json:"decision"`
-	Approver       string    `json:"approver"`
-	ResponseCode   int       `json:"response_code"`
-	Duration       int64     `json:"duration_ms"`
+type LLMConfig struct {
+	Provider    string  `json:"provider"`
+	BaseURL     string  `json:"base_url"`
+	APIKey      string  `json:"api_key"`
+	Model       string  `json:"model"`
+	MaxTokens   int     `json:"max_tokens"`
+	Temperature float64 `json:"temperature"`
 }
 
-// LLM 请求结构
-type OllamaRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
+type FeishuConfig struct {
+	Enabled                bool   `json:"enabled"`
+	AppID                  string `json:"app_id"`
+	AppSecret              string `json:"app_secret"`
+	ApprovalUserID         string `json:"approval_user_id"`
+	ChatID                 string `json:"chat_id"` // 可选；当 approval_user_id 报 open_id cross app 时，改用 chat 发审批并轮询此 chat
+	ApprovalTimeoutMinutes int    `json:"approval_timeout_minutes"`
+	UseInteractiveCard     bool   `json:"use_interactive_card"`
+	UseMessageReply        bool   `json:"use_message_reply"`
+	PollIntervalSeconds    int    `json:"poll_interval_seconds"`
 }
 
-type OllamaResponse struct {
-	Response string `json:"response"`
+type RiskConfig struct {
+	DangerousMethods   []string `json:"dangerous_methods"`
+	DangerousPaths     []string `json:"dangerous_paths"`
+	AutoApproveMethods []string `json:"auto_approve_methods"`
+	SafeDomains        []string `json:"safe_domains"`
 }
+
+type AuditConfig struct {
+	LogFile string `json:"log_file"`
+	Enabled bool   `json:"enabled"`
+}
+
+// ============================================================================
+// Feishu API Structures
+// ============================================================================
+
+type FeishuTokenResponse struct {
+	Code              int    `json:"code"`
+	Msg               string `json:"msg"`
+	TenantAccessToken string `json:"tenant_access_token"`
+	Expire            int    `json:"expire"`
+}
+
+type FeishuMessageRequest struct {
+	ReceiveID string `json:"receive_id"`
+	MsgType   string `json:"msg_type"`
+	Content   string `json:"content"`
+}
+
+type FeishuMessageResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		MessageID string `json:"message_id"`
+	} `json:"data"`
+}
+
+type FeishuMessagesResponse struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		HasMore bool `json:"has_more"`
+		Items   []struct {
+			MessageID  string `json:"message_id"`
+			ChatID     string `json:"chat_id"`
+			Sender     struct {
+				SenderID struct {
+					UserID string `json:"user_id"`
+				} `json:"sender_id"`
+			} `json:"sender"`
+			Body struct {
+				Content string `json:"content"`
+			} `json:"body"`
+			CreateTime string `json:"create_time"`
+		} `json:"items"`
+	} `json:"data"`
+}
+
+// ============================================================================
+// Claude API Structures
+// ============================================================================
+
+type ClaudeRequest struct {
+	Model       string          `json:"model"`
+	MaxTokens   int             `json:"max_tokens"`
+	Temperature float64         `json:"temperature"`
+	Messages    []ClaudeMessage `json:"messages"`
+}
+
+type ClaudeMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ClaudeResponse struct {
+	Content []struct {
+		Text string `json:"text"`
+	} `json:"content"`
+}
+
+type IntentAnalysis struct {
+	RiskLevel   string `json:"risk_level"`   // "safe", "medium", "high"
+	Reason      string `json:"reason"`
+	Recommended string `json:"recommended"`  // "approve", "deny", "review"
+}
+
+// ============================================================================
+// Approval System
+// ============================================================================
+
+type ApprovalRequest struct {
+	ID          string
+	Method      string
+	URL         string
+	Host        string
+	Path        string
+	Body        string
+	Intent      *IntentAnalysis
+	Timestamp   time.Time
+	ResponseCh  chan ApprovalResponse
+	ReplyChatID string // 若审批消息发到了群/会话，轮询时用此 chat_id
+}
+
+type ApprovalResponse struct {
+	Approved bool
+	Reason   string
+}
+
+// ============================================================================
+// Global State
+// ============================================================================
+
+var (
+	config            Config
+	feishuAccessToken string
+	tokenExpiry       time.Time
+	tokenMutex        sync.RWMutex
+	approvalRequests  = make(map[string]*ApprovalRequest)
+	approvalMutex     sync.RWMutex
+	auditFile         *os.File
+)
+
+// ============================================================================
+// Main Function
+// ============================================================================
 
 func main() {
-	color.Cyan("╔════════════════════════════════════════════════════════╗")
-	color.Cyan("║         Diting 治理网关 v0.2.0                        ║")
-	color.Cyan("║    企业级智能体零信任治理平台 - HTTPS 代理支持        ║")
-	color.Cyan("╚════════════════════════════════════════════════════════╝")
-	fmt.Println()
-
-	// 检查 Ollama 是否可用
-	if !checkOllama() {
-		color.Yellow("⚠️  警告: Ollama 未运行，将使用规则引擎模式")
-		color.Yellow("   启动 Ollama: ollama serve")
-		color.Yellow("   下载模型: ollama pull %s", config.OllamaModel)
-		fmt.Println()
+	// Load configuration
+	if err := loadConfig("/home/dministrator/workspace/sentinel-ai/cmd/diting/config.json"); err != nil {
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// 创建 HTTP 服务器
+	// Initialize audit logging
+	if config.Audit.Enabled {
+		if err := initAuditLog(); err != nil {
+			log.Fatalf("Failed to initialize audit log: %v", err)
+		}
+		defer auditFile.Close()
+	}
+
+	// Start Feishu message polling if enabled
+	if config.Feishu.Enabled {
+		go pollFeishuMessagesLoop()
+	}
+
+	// Start proxy server
+	log.Printf("Starting Diting proxy server on %s", config.Proxy.Listen)
 	server := &http.Server{
-		Addr: config.ProxyListen,
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodConnect {
-				// HTTPS 代理 (CONNECT 方法)
-				handleHTTPS(w, r)
-			} else {
-				// HTTP 代理
-				handleHTTP(w, r)
-			}
-		}),
+		Addr:    config.Proxy.Listen,
+		Handler: http.HandlerFunc(handleRequest),
 	}
 
-	color.Green("✓ 代理服务器启动成功")
-	color.White("  监听地址: http://localhost%s", config.ProxyListen)
-	color.White("  支持协议: HTTP + HTTPS (CONNECT)")
-	fmt.Println()
-	color.Cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println()
-
-	log.Fatal(server.ListenAndServe())
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("Proxy server failed: %v", err)
+	}
 }
 
-// 处理 HTTPS 请求 (CONNECT 方法)
-func handleHTTPS(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
+// ============================================================================
+// Configuration Loading
+// ============================================================================
 
-	// 打印请求信息
-	color.Cyan("\n[%s] 收到 HTTPS 请求", time.Now().Format("15:04:05"))
-	fmt.Printf("  方法: %s\n", color.YellowString(r.Method))
-	fmt.Printf("  目标: %s\n", color.WhiteString(r.Host))
-
-	// 风险评估 (基于目标域名)
-	riskLevel := assessRiskHTTPS(r.Host)
-	fmt.Printf("  风险等级: %s\n", colorizeRisk(riskLevel))
-
-	// 创建审计日志
-	audit := AuditLog{
-		Timestamp: time.Now(),
-		Method:    r.Method,
-		Host:      r.Host,
-		Path:      "/",
-		RiskLevel: riskLevel,
-	}
-
-	// 决策逻辑
-	var decision string
-	var intentAnalysis string
-
-	if riskLevel == "低" {
-		decision = "ALLOW"
-		color.Green("  决策: 自动放行")
-	} else {
-		// LLM 意图分析
-		intentAnalysis = analyzeIntentHTTPS(r.Host)
-		fmt.Printf("\n  🤖 LLM 意图分析:\n")
-		color.Cyan("  %s", intentAnalysis)
-		fmt.Println()
-
-		// 人工审批
-		decision = humanApprovalHTTPS(r.Host, intentAnalysis)
-	}
-
-	audit.IntentAnalysis = intentAnalysis
-	audit.Decision = decision
-
-	// 执行决策
-	if decision == "ALLOW" {
-		color.Green("\n  ✓ 连接已放行")
-
-		// 劫持连接
-		hijacker, ok := w.(http.Hijacker)
-		if !ok {
-			color.Red("  ✗ Hijacking 不支持")
-			http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
-			audit.ResponseCode = 500
-			saveAuditLog(audit)
-			return
-		}
-
-		clientConn, _, err := hijacker.Hijack()
-		if err != nil {
-			color.Red("  ✗ Hijack 失败: %v", err)
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
-			audit.ResponseCode = 503
-			saveAuditLog(audit)
-			return
-		}
-		defer clientConn.Close()
-
-		// 连接到目标服务器
-		targetConn, err := net.DialTimeout("tcp", r.Host, 10*time.Second)
-		if err != nil {
-			color.Red("  ✗ 连接目标失败: %v", err)
-			clientConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
-			audit.ResponseCode = 502
-			saveAuditLog(audit)
-			return
-		}
-		defer targetConn.Close()
-
-		// 返回 200 Connection Established
-		if _, err := clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
-			color.Red("  ✗ 写入响应失败: %v", err)
-			audit.ResponseCode = 500
-			saveAuditLog(audit)
-			return
-		}
-
-		// 双向转发数据（使用 WaitGroup 等待两个方向都完成）
-		var wg sync.WaitGroup
-		wg.Add(2)
-
-		// Client -> Target
-		go func() {
-			defer wg.Done()
-			io.Copy(targetConn, clientConn)
-			targetConn.(*net.TCPConn).CloseWrite()
-		}()
-
-		// Target -> Client
-		go func() {
-			defer wg.Done()
-			io.Copy(clientConn, targetConn)
-			clientConn.(*net.TCPConn).CloseWrite()
-		}()
-
-		wg.Wait()
-
-		audit.ResponseCode = 200
-	} else {
-		color.Red("\n  ✗ 连接已拒绝")
-		w.WriteHeader(http.StatusForbidden)
-		response := map[string]interface{}{
-			"error":   "连接被 Diting 拒绝",
-			"reason":  intentAnalysis,
-			"policy":  "需要管理员审批",
-			"contact": "请联系安全管理员",
-		}
-		json.NewEncoder(w).Encode(response)
-		audit.ResponseCode = 403
-		audit.Approver = "DENIED"
-	}
-
-	// 记录耗时
-	duration := time.Since(startTime).Milliseconds()
-	audit.Duration = duration
-	fmt.Printf("  耗时: %dms\n", duration)
-
-	// 保存审计日志
-	saveAuditLog(audit)
-
-	color.Cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-}
-
-// 处理 HTTP 请求
-func handleHTTP(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
-
-	// 打印请求信息
-	color.Cyan("\n[%s] 收到 HTTP 请求", time.Now().Format("15:04:05"))
-	fmt.Printf("  方法: %s\n", color.YellowString(r.Method))
-	fmt.Printf("  URL: %s\n", color.WhiteString(r.URL.String()))
-
-	// 读取请求体
-	bodyBytes, _ := io.ReadAll(r.Body)
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	bodyStr := string(bodyBytes)
-	if len(bodyStr) > 200 {
-		bodyStr = bodyStr[:200] + "..."
-	}
-
-	// 风险评估
-	riskLevel := assessRisk(r, bodyStr)
-	fmt.Printf("  风险等级: %s\n", colorizeRisk(riskLevel))
-
-	// 创建审计日志
-	audit := AuditLog{
-		Timestamp: time.Now(),
-		Method:    r.Method,
-		Host:      r.Host,
-		Path:      r.URL.Path,
-		Body:      bodyStr,
-		RiskLevel: riskLevel,
-	}
-
-	// 决策逻辑
-	var decision string
-	var intentAnalysis string
-
-	if riskLevel == "低" {
-		decision = "ALLOW"
-		color.Green("  决策: 自动放行")
-	} else {
-		// 调用 LLM 分析意图
-		intentAnalysis = analyzeIntent(r, bodyStr)
-		fmt.Printf("\n  🤖 LLM 意图分析:\n")
-		color.Cyan("  %s", intentAnalysis)
-		fmt.Println()
-
-		// 人工审批
-		decision = humanApproval(r, intentAnalysis)
-	}
-
-	audit.IntentAnalysis = intentAnalysis
-	audit.Decision = decision
-
-	// 执行决策
-	if decision == "ALLOW" {
-		color.Green("\n  ✓ 请求已放行")
-
-		// 转发请求
-		statusCode := proxyRequest(w, r)
-		audit.ResponseCode = statusCode
-	} else {
-		color.Red("\n  ✗ 请求已拒绝")
-		w.WriteHeader(http.StatusForbidden)
-		response := map[string]interface{}{
-			"error":   "操作被 Diting 拒绝",
-			"reason":  intentAnalysis,
-			"policy":  "需要管理员审批",
-			"contact": "请联系安全管理员",
-		}
-		json.NewEncoder(w).Encode(response)
-		audit.ResponseCode = 403
-		audit.Approver = "DENIED"
-	}
-
-	// 记录耗时
-	duration := time.Since(startTime).Milliseconds()
-	audit.Duration = duration
-	fmt.Printf("  耗时: %dms\n", duration)
-
-	// 保存审计日志
-	saveAuditLog(audit)
-
-	color.Cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-}
-
-// 转发 HTTP 请求（返回状态码）
-func proxyRequest(w http.ResponseWriter, r *http.Request) int {
-	// 构建目标 URL
-	targetURL := r.URL.String()
-	
-	// 如果是代理请求，URL 已经是完整的
-	// 如果不是，需要从 Host 头构建
-	if !strings.HasPrefix(targetURL, "http") {
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		targetURL = fmt.Sprintf("%s://%s%s", scheme, r.Host, r.URL.Path)
-		if r.URL.RawQuery != "" {
-			targetURL += "?" + r.URL.RawQuery
-		}
-	}
-
-	// 创建新的请求
-	proxyReq, err := http.NewRequest(r.Method, targetURL, bytes.NewReader([]byte{}))
+func loadConfig(path string) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		color.Red("  ✗ 创建请求失败: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return 500
+		return fmt.Errorf("read config file: %w", err)
 	}
 
-	// 读取原始请求体
-	bodyBytes, _ := io.ReadAll(r.Body)
-	proxyReq.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
 
-	// 复制请求头（排除 hop-by-hop 头）
-	for key, values := range r.Header {
-		// 跳过 hop-by-hop 头
-		if key == "Connection" || key == "Proxy-Connection" || 
-		   key == "Keep-Alive" || key == "Proxy-Authenticate" ||
-		   key == "Proxy-Authorization" || key == "Te" || 
-		   key == "Trailer" || key == "Transfer-Encoding" || key == "Upgrade" {
-			continue
+	log.Printf("Configuration loaded successfully")
+	return nil
+}
+
+// ============================================================================
+// Audit Logging
+// ============================================================================
+
+func initAuditLog() error {
+	logDir := filepath.Dir(config.Audit.LogFile)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("create log directory: %w", err)
+	}
+
+	f, err := os.OpenFile(config.Audit.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("open audit log: %w", err)
+	}
+
+	auditFile = f
+	return nil
+}
+
+func logAudit(entry map[string]interface{}) {
+	if !config.Audit.Enabled || auditFile == nil {
+		return
+	}
+
+	entry["timestamp"] = time.Now().Format(time.RFC3339)
+	data, _ := json.Marshal(entry)
+	auditFile.Write(data)
+	auditFile.Write([]byte("\n"))
+}
+
+// ============================================================================
+// Feishu API Functions
+// ============================================================================
+
+func getTenantAccessToken() (string, error) {
+	tokenMutex.RLock()
+	if time.Now().Before(tokenExpiry) && feishuAccessToken != "" {
+		token := feishuAccessToken
+		tokenMutex.RUnlock()
+		return token, nil
+	}
+	tokenMutex.RUnlock()
+
+	tokenMutex.Lock()
+	defer tokenMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if time.Now().Before(tokenExpiry) && feishuAccessToken != "" {
+		return feishuAccessToken, nil
+	}
+
+	reqBody := map[string]string{
+		"app_id":     config.Feishu.AppID,
+		"app_secret": config.Feishu.AppSecret,
+	}
+	reqData, _ := json.Marshal(reqBody)
+
+	resp, err := http.Post(
+		"https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+		"application/json",
+		bytes.NewReader(reqData),
+	)
+	if err != nil {
+		return "", fmt.Errorf("request token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var tokenResp FeishuTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("decode token response: %w", err)
+	}
+
+	if tokenResp.Code != 0 {
+		return "", fmt.Errorf("feishu API error: %s", tokenResp.Msg)
+	}
+
+	feishuAccessToken = tokenResp.TenantAccessToken
+	tokenExpiry = time.Now().Add(time.Duration(tokenResp.Expire-300) * time.Second)
+
+	log.Printf("Feishu access token refreshed, expires in %d seconds", tokenResp.Expire)
+	return feishuAccessToken, nil
+}
+
+func sendFeishuMessage(receiveID, content string) (string, error) {
+	token, err := getTenantAccessToken()
+	if err != nil {
+		return "", fmt.Errorf("get access token: %w", err)
+	}
+
+	// 配置里可能是 open_id(ou_xxx) 或 user_id，按前缀选择 receive_id_type
+	receiveIDType := "user_id"
+	if strings.HasPrefix(receiveID, "ou_") {
+		receiveIDType = "open_id"
+	}
+
+	msgContent := map[string]string{"text": content}
+	contentJSON, _ := json.Marshal(msgContent)
+
+	msgReq := FeishuMessageRequest{
+		ReceiveID: receiveID,
+		MsgType:   "text",
+		Content:   string(contentJSON),
+	}
+	reqData, _ := json.Marshal(msgReq)
+
+	req, _ := http.NewRequest(
+		"POST",
+		"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type="+receiveIDType,
+		bytes.NewReader(reqData),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send message: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var msgResp FeishuMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&msgResp); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	if msgResp.Code != 0 {
+		msg := msgResp.Msg
+		if strings.Contains(msg, "open_id cross app") {
+			msg = msg + "（请将 config 中 approval_user_id 改为该用户在本应用下的 user_id，不要使用其他应用的 open_id。在飞书管理后台或通过「获取用户 user_id」接口查询）"
 		}
-		for _, value := range values {
-			proxyReq.Header.Add(key, value)
+		return "", fmt.Errorf("feishu API error: %s", msg)
+	}
+
+	return msgResp.Data.MessageID, nil
+}
+
+// 向群/会话发消息（receive_id_type=chat_id），用于 open_id cross app 时回退
+func sendFeishuMessageToChat(chatID, content string) (string, error) {
+	token, err := getTenantAccessToken()
+	if err != nil {
+		return "", fmt.Errorf("get access token: %w", err)
+	}
+	msgContent := map[string]string{"text": content}
+	contentJSON, _ := json.Marshal(msgContent)
+	msgReq := FeishuMessageRequest{
+		ReceiveID: chatID,
+		MsgType:   "text",
+		Content:   string(contentJSON),
+	}
+	reqData, _ := json.Marshal(msgReq)
+	req, _ := http.NewRequest(
+		"POST",
+		"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+		bytes.NewReader(reqData),
+	)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send message to chat: %w", err)
+	}
+	defer resp.Body.Close()
+	var msgResp FeishuMessageResponse
+	if err := json.NewDecoder(resp.Body).Decode(&msgResp); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+	if msgResp.Code != 0 {
+		return "", fmt.Errorf("feishu API error: %s", msgResp.Msg)
+	}
+	return msgResp.Data.MessageID, nil
+}
+
+func pollFeishuMessages(containerID string, since time.Time, acceptAnySender bool) ([]string, error) {
+	token, err := getTenantAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("get access token: %w", err)
+	}
+
+	url := fmt.Sprintf(
+		"https://open.feishu.cn/open-apis/im/v1/messages?container_id_type=chat&container_id=%s&start_time=%d",
+		containerID,
+		since.Unix(),
+	)
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("poll messages: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var msgResp FeishuMessagesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&msgResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	if msgResp.Code != 0 {
+		return nil, fmt.Errorf("feishu API error: %s", msgResp.Msg)
+	}
+
+	var messages []string
+	for _, item := range msgResp.Data.Items {
+		if acceptAnySender || item.Sender.SenderID.UserID == config.Feishu.ApprovalUserID {
+			var content map[string]string
+			json.Unmarshal([]byte(item.Body.Content), &content)
+			if text, ok := content["text"]; ok {
+				messages = append(messages, strings.TrimSpace(text))
+			}
 		}
 	}
 
-	// 创建 HTTP 客户端
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     90 * time.Second,
+	return messages, nil
+}
+
+func pollFeishuMessagesLoop() {
+	if !config.Feishu.UseMessageReply {
+		return
+	}
+
+	interval := time.Duration(config.Feishu.PollIntervalSeconds) * time.Second
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	log.Printf("Started Feishu message polling (interval: %v)", interval)
+
+	for range ticker.C {
+		approvalMutex.RLock()
+		requests := make([]*ApprovalRequest, 0, len(approvalRequests))
+		for _, req := range approvalRequests {
+			requests = append(requests, req)
+		}
+		approvalMutex.RUnlock()
+
+		for _, req := range requests {
+			// 若审批发到了 chat，则轮询该 chat；否则轮询原 approval_user 对应会话（需 API 支持）
+			pollContainer := config.Feishu.ApprovalUserID
+			acceptAny := false
+			if req.ReplyChatID != "" {
+				pollContainer = req.ReplyChatID
+				acceptAny = true
+			}
+			messages, err := pollFeishuMessages(pollContainer, req.Timestamp, acceptAny)
+			if err != nil {
+				log.Printf("Error polling messages for request %s: %v", req.ID, err)
+				continue
+			}
+
+			// Check for approval/denial keywords
+			for _, msg := range messages {
+				msgLower := strings.ToLower(msg)
+				if strings.Contains(msgLower, req.ID[:8]) {
+					var approved bool
+					var reason string
+
+					if strings.Contains(msgLower, "approve") || strings.Contains(msgLower, "同意") || 
+					   strings.Contains(msgLower, "允许") || strings.Contains(msgLower, "yes") {
+						approved = true
+						reason = "Approved by user via Feishu message"
+					} else if strings.Contains(msgLower, "deny") || strings.Contains(msgLower, "拒绝") || 
+					          strings.Contains(msgLower, "禁止") || strings.Contains(msgLower, "no") {
+						approved = false
+						reason = "Denied by user via Feishu message"
+					} else {
+						continue
+					}
+
+					// Send response
+					select {
+					case req.ResponseCh <- ApprovalResponse{Approved: approved, Reason: reason}:
+						log.Printf("Approval response sent for request %s: approved=%v", req.ID, approved)
+					default:
+					}
+
+					// Remove from pending requests
+					approvalMutex.Lock()
+					delete(approvalRequests, req.ID)
+					approvalMutex.Unlock()
+					break
+				}
+			}
+		}
+	}
+}
+
+// ============================================================================
+// Claude API Functions
+// ============================================================================
+
+func analyzeIntentWithClaude(method, path, body string) (*IntentAnalysis, error) {
+	prompt := fmt.Sprintf(`Analyze this HTTP request and determine its risk level and intent.
+
+Method: %s
+Path: %s
+Body: %s
+
+Respond with JSON only:
+{
+  "risk_level": "safe|medium|high",
+  "reason": "brief explanation",
+  "recommended": "approve|deny|review"
+}`, method, path, body)
+
+	reqBody := ClaudeRequest{
+		Model:       config.LLM.Model,
+		MaxTokens:   config.LLM.MaxTokens,
+		Temperature: config.LLM.Temperature,
+		Messages: []ClaudeMessage{
+			{Role: "user", Content: prompt},
 		},
-		// 不自动跟随重定向
+	}
+
+	reqData, _ := json.Marshal(reqBody)
+
+	req, _ := http.NewRequest("POST", config.LLM.BaseURL+"/v1/messages", bytes.NewReader(reqData))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", config.LLM.APIKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("claude API request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("claude API error %d: %s", resp.StatusCode, string(body))
+	}
+
+	var claudeResp ClaudeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&claudeResp); err != nil {
+		return nil, fmt.Errorf("decode claude response: %w", err)
+	}
+
+	if len(claudeResp.Content) == 0 {
+		return nil, fmt.Errorf("empty claude response")
+	}
+
+	// Extract JSON from response
+	text := claudeResp.Content[0].Text
+	start := strings.Index(text, "{")
+	end := strings.LastIndex(text, "}")
+	if start == -1 || end == -1 {
+		return nil, fmt.Errorf("no JSON found in response")
+	}
+
+	var analysis IntentAnalysis
+	if err := json.Unmarshal([]byte(text[start:end+1]), &analysis); err != nil {
+		return nil, fmt.Errorf("parse intent analysis: %w", err)
+	}
+
+	return &analysis, nil
+}
+
+// ============================================================================
+// Approval Logic
+// ============================================================================
+
+func sendApprovalRequest(req *ApprovalRequest) error {
+	if !config.Feishu.Enabled {
+		return fmt.Errorf("feishu not enabled")
+	}
+
+	// Build approval message
+	var msg strings.Builder
+	msg.WriteString(fmt.Sprintf("🔔 代理请求审批 [%s]\n\n", req.ID[:8]))
+	msg.WriteString(fmt.Sprintf("方法: %s\n", req.Method))
+	msg.WriteString(fmt.Sprintf("主机: %s\n", req.Host))
+	msg.WriteString(fmt.Sprintf("路径: %s\n", req.Path))
+	
+	if req.Body != "" && len(req.Body) < 200 {
+		msg.WriteString(fmt.Sprintf("请求体: %s\n", req.Body))
+	}
+	
+	if req.Intent != nil {
+		msg.WriteString(fmt.Sprintf("\n🤖 AI 分析:\n"))
+		msg.WriteString(fmt.Sprintf("风险等级: %s\n", req.Intent.RiskLevel))
+		msg.WriteString(fmt.Sprintf("原因: %s\n", req.Intent.Reason))
+		msg.WriteString(fmt.Sprintf("建议: %s\n", req.Intent.Recommended))
+	}
+	
+	msg.WriteString(fmt.Sprintf("\n请回复: approve %s 或 deny %s", req.ID[:8], req.ID[:8]))
+
+	msgStr := msg.String()
+	// 先尝试发到 approval_user_id
+	messageID, err := sendFeishuMessage(config.Feishu.ApprovalUserID, msgStr)
+	if err != nil && strings.Contains(err.Error(), "open_id cross app") && config.Feishu.ChatID != "" {
+		// 回退：发到 chat_id（群/会话），并标记该请求用 chat 轮询
+		messageID, err = sendFeishuMessageToChat(config.Feishu.ChatID, msgStr)
+		if err != nil {
+			return fmt.Errorf("send feishu message (chat fallback): %w", err)
+		}
+		req.ReplyChatID = config.Feishu.ChatID
+		log.Printf("Approval request sent to Feishu chat (open_id cross app fallback), message_id=%s", messageID)
+	} else if err != nil {
+		return fmt.Errorf("send feishu message: %w", err)
+	} else {
+		log.Printf("Approval request sent to Feishu, message_id=%s", messageID)
+	}
+
+	// Store request for polling
+	approvalMutex.Lock()
+	approvalRequests[req.ID] = req
+	approvalMutex.Unlock()
+
+	return nil
+}
+
+func waitForApproval(requestID string, timeout time.Duration) ApprovalResponse {
+	approvalMutex.RLock()
+	req, exists := approvalRequests[requestID]
+	approvalMutex.RUnlock()
+
+	if !exists {
+		return ApprovalResponse{Approved: false, Reason: "Request not found"}
+	}
+
+	select {
+	case resp := <-req.ResponseCh:
+		return resp
+	case <-time.After(timeout):
+		// Cleanup
+		approvalMutex.Lock()
+		delete(approvalRequests, requestID)
+		approvalMutex.Unlock()
+		
+		return ApprovalResponse{Approved: false, Reason: "Approval timeout"}
+	}
+}
+
+func needsApproval(method, host, path string) bool {
+	// Check auto-approve methods
+	for _, m := range config.Risk.AutoApproveMethods {
+		if strings.EqualFold(method, m) {
+			return false
+		}
+	}
+
+	// Check safe domains
+	for _, domain := range config.Risk.SafeDomains {
+		if strings.Contains(host, domain) {
+			return false
+		}
+	}
+
+	// Check dangerous methods
+	for _, m := range config.Risk.DangerousMethods {
+		if strings.EqualFold(method, m) {
+			return true
+		}
+	}
+
+	// Check dangerous paths
+	pathLower := strings.ToLower(path)
+	for _, p := range config.Risk.DangerousPaths {
+		if strings.Contains(pathLower, strings.ToLower(p)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ============================================================================
+// Proxy Handlers
+// ============================================================================
+
+func handleRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodConnect {
+		handleHTTPS(w, r)
+	} else {
+		handleHTTP(w, r)
+	}
+}
+
+func handleHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTP: %s %s", r.Method, r.URL.String())
+
+	// Read body for analysis
+	var bodyBytes []byte
+	if r.Body != nil {
+		bodyBytes, _ = io.ReadAll(r.Body)
+		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
+	// Check if approval needed
+	if needsApproval(r.Method, r.Host, r.URL.Path) {
+		if !handleApprovalFlow(w, r, string(bodyBytes)) {
+			return
+		}
+	}
+
+	// Log audit
+	logAudit(map[string]interface{}{
+		"type":   "http_request",
+		"method": r.Method,
+		"host":   r.Host,
+		"path":   r.URL.Path,
+		"approved": true,
+	})
+
+	// Forward request
+	client := &http.Client{
+		Timeout: time.Duration(config.Proxy.TimeoutSeconds) * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
 
-	// 发送请求
+	proxyReq, err := http.NewRequest(r.Method, r.URL.String(), bytes.NewReader(bodyBytes))
+	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
+	}
+
+	// Copy headers
+	for key, values := range r.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(key, value)
+		}
+	}
+
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		color.Red("  ✗ 请求失败: %v", err)
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return 502
+		http.Error(w, fmt.Sprintf("Request failed: %v", err), http.StatusBadGateway)
+		return
 	}
 	defer resp.Body.Close()
 
-	// 复制响应头
+	// Copy response headers
 	for key, values := range resp.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
 	}
 
-	// 设置状态码
 	w.WriteHeader(resp.StatusCode)
-
-	// 复制响应体
 	io.Copy(w, resp.Body)
-
-	return resp.StatusCode
 }
 
-// HTTPS 风险评估
-func assessRiskHTTPS(host string) string {
-	hostLower := strings.ToLower(host)
-	
-	// 移除端口号
-	if idx := strings.Index(hostLower, ":"); idx != -1 {
-		hostLower = hostLower[:idx]
-	}
+func handleHTTPS(w http.ResponseWriter, r *http.Request) {
+	log.Printf("HTTPS: CONNECT %s", r.Host)
 
-	// 检查危险域名
-	dangerousDomains := []string{"malware", "phishing", "hack", "exploit", "crack"}
-	for _, domain := range dangerousDomains {
-		if strings.Contains(hostLower, domain) {
-			return "高"
+	// Check if approval needed (for CONNECT we only check host)
+	if needsApproval("CONNECT", r.Host, "") {
+		if !handleApprovalFlow(w, r, "") {
+			return
 		}
 	}
 
-	// 检查常见安全域名
-	safeDomains := []string{
-		"google.com", "github.com", "microsoft.com", "apple.com",
-		"amazon.com", "cloudflare.com", "openai.com",
-	}
-	for _, domain := range safeDomains {
-		if strings.Contains(hostLower, domain) {
-			return "低"
-		}
-	}
+	// Log audit
+	logAudit(map[string]interface{}{
+		"type":     "https_connect",
+		"host":     r.Host,
+		"approved": true,
+	})
 
-	return "中"
-}
-
-// HTTP 风险评估
-func assessRisk(r *http.Request, body string) string {
-	// 自动放行的方法
-	for _, method := range config.AutoApproveMethods {
-		if r.Method == method {
-			return "低"
-		}
-	}
-
-	// 危险方法
-	for _, method := range config.DangerousMethods {
-		if r.Method == method {
-			return "高"
-		}
-	}
-
-	// 危险路径
-	for _, path := range config.DangerousPaths {
-		if strings.Contains(strings.ToLower(r.URL.Path), path) {
-			return "高"
-		}
-	}
-
-	// 检查请求体中的危险关键词
-	dangerousKeywords := []string{"delete", "drop", "truncate", "remove", "destroy"}
-	bodyLower := strings.ToLower(body)
-	for _, keyword := range dangerousKeywords {
-		if strings.Contains(bodyLower, keyword) {
-			return "中"
-		}
-	}
-
-	return "中"
-}
-
-// HTTPS 意图分析
-func analyzeIntentHTTPS(host string) string {
-	prompt := fmt.Sprintf(`你是一个企业安全分析专家。请分析以下 HTTPS 连接请求的意图和风险：
-
-目标域名: %s
-
-请简洁回答（50字以内）：
-1. 这个域名的用途是什么？
-2. 可能存在什么风险？
-3. 是否应该批准？
-
-只返回分析结果，不要解释。`, host)
-
-	// 尝试调用 Ollama
-	if checkOllama() {
-		reqBody := OllamaRequest{
-			Model:  config.OllamaModel,
-			Prompt: prompt,
-			Stream: false,
-		}
-
-		jsonData, _ := json.Marshal(reqBody)
-		resp, err := http.Post(
-			config.OllamaEndpoint+"/api/generate",
-			"application/json",
-			bytes.NewBuffer(jsonData),
-		)
-
-		if err == nil && resp.StatusCode == 200 {
-			var ollamaResp OllamaResponse
-			json.NewDecoder(resp.Body).Decode(&ollamaResp)
-			resp.Body.Close()
-			if ollamaResp.Response != "" {
-				return strings.TrimSpace(ollamaResp.Response)
-			}
-		}
-	}
-
-	// 降级到规则引擎
-	if strings.Contains(host, "api") {
-		return "意图: API 调用。影响: 可能修改数据。建议: 建议审批。"
-	}
-	return "意图: HTTPS 连接。影响: 未知。建议: 建议审批。"
-}
-
-// HTTP 意图分析
-func analyzeIntent(r *http.Request, body string) string {
-	prompt := fmt.Sprintf(`你是一个企业安全分析专家。请分析以下 API 请求的意图和风险：
-
-请求方法: %s
-请求路径: %s
-请求体: %s
-
-请简洁回答（50字以内）：
-1. 这个操作的意图是什么？
-2. 可能造成什么影响？
-3. 是否应该批准？
-
-只返回分析结果，不要解释。`, r.Method, r.URL.Path, body)
-
-	// 尝试调用 Ollama
-	if checkOllama() {
-		reqBody := OllamaRequest{
-			Model:  config.OllamaModel,
-			Prompt: prompt,
-			Stream: false,
-		}
-
-		jsonData, _ := json.Marshal(reqBody)
-		resp, err := http.Post(
-			config.OllamaEndpoint+"/api/generate",
-			"application/json",
-			bytes.NewBuffer(jsonData),
-		)
-
-		if err == nil && resp.StatusCode == 200 {
-			var ollamaResp OllamaResponse
-			json.NewDecoder(resp.Body).Decode(&ollamaResp)
-			resp.Body.Close()
-			if ollamaResp.Response != "" {
-				return strings.TrimSpace(ollamaResp.Response)
-			}
-		}
-	}
-
-	// 降级到规则引擎
-	if r.Method == "DELETE" {
-		return "意图: 删除数据。影响: 数据不可恢复。建议: 需要审批。"
-	}
-	if strings.Contains(r.URL.Path, "production") {
-		return "意图: 操作生产环境。影响: 可能影响业务。建议: 需要审批。"
-	}
-	return "意图: 修改数据。影响: 中等风险。建议: 建议审批。"
-}
-
-// HTTPS 人工审批
-func humanApprovalHTTPS(host string, analysis string) string {
-	color.Yellow("\n╔════════════════════════════════════════════════════════╗")
-	color.Yellow("║                  🚨 需要人工审批                       ║")
-	color.Yellow("╚════════════════════════════════════════════════════════╝")
-	fmt.Printf("\n  连接: HTTPS %s\n", host)
-	fmt.Printf("  分析: %s\n\n", analysis)
-	color.Yellow("  是否批准此连接? (y/n): ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "y" || input == "yes" {
-		return "ALLOW"
-	}
-	return "DENY"
-}
-
-// HTTP 人工审批
-func humanApproval(r *http.Request, analysis string) string {
-	color.Yellow("\n╔════════════════════════════════════════════════════════╗")
-	color.Yellow("║                  🚨 需要人工审批                       ║")
-	color.Yellow("╚════════════════════════════════════════════════════════╝")
-	fmt.Printf("\n  请求: %s %s\n", r.Method, r.URL.Path)
-	fmt.Printf("  分析: %s\n\n", analysis)
-	color.Yellow("  是否批准此操作? (y/n): ")
-
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "y" || input == "yes" {
-		return "ALLOW"
-	}
-	return "DENY"
-}
-
-func checkOllama() bool {
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(config.OllamaEndpoint + "/api/tags")
+	// Establish connection to target
+	targetConn, err := net.DialTimeout("tcp", r.Host, time.Duration(config.Proxy.TimeoutSeconds)*time.Second)
 	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == 200
-}
-
-func saveAuditLog(audit AuditLog) {
-	// 简单的文件日志
-	logFile := "../../logs/audit.jsonl"
-	os.MkdirAll("../../logs", 0755)
-
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Printf("保存审计日志失败: %v", err)
+		http.Error(w, "Failed to connect to target", http.StatusBadGateway)
 		return
 	}
-	defer f.Close()
+	defer targetConn.Close()
 
-	jsonData, _ := json.Marshal(audit)
-	f.Write(jsonData)
-	f.WriteString("\n")
+	// Hijack client connection
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return
+	}
+
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, "Failed to hijack connection", http.StatusInternalServerError)
+		return
+	}
+	defer clientConn.Close()
+
+	// Send 200 Connection Established
+	clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+
+	// Bidirectional copy
+	go io.Copy(targetConn, clientConn)
+	io.Copy(clientConn, targetConn)
 }
 
-func colorizeRisk(level string) string {
-	switch level {
-	case "高":
-		return color.RedString("高 🔴")
-	case "中":
-		return color.YellowString("中 🟡")
-	default:
-		return color.GreenString("低 🟢")
+func handleApprovalFlow(w http.ResponseWriter, r *http.Request, body string) bool {
+	if !config.Feishu.Enabled {
+		log.Printf("Approval needed but Feishu disabled, denying request")
+		http.Error(w, "Request requires approval but approval system is disabled", http.StatusForbidden)
+		return false
 	}
+
+	// Analyze intent with Claude
+	var intent *IntentAnalysis
+	if config.LLM.Provider == "anthropic" {
+		var err error
+		intent, err = analyzeIntentWithClaude(r.Method, r.URL.Path, body)
+		if err != nil {
+			log.Printf("Intent analysis failed: %v", err)
+		}
+	}
+
+	// Create approval request
+	approvalReq := &ApprovalRequest{
+		ID:         uuid.New().String(),
+		Method:     r.Method,
+		URL:        r.URL.String(),
+		Host:       r.Host,
+		Path:       r.URL.Path,
+		Body:       body,
+		Intent:     intent,
+		Timestamp:  time.Now(),
+		ResponseCh: make(chan ApprovalResponse, 1),
+	}
+
+	// Send approval request
+	if err := sendApprovalRequest(approvalReq); err != nil {
+		log.Printf("Failed to send approval request: %v", err)
+		http.Error(w, "Failed to request approval", http.StatusInternalServerError)
+		return false
+	}
+
+	// Wait for approval
+	timeout := time.Duration(config.Feishu.ApprovalTimeoutMinutes) * time.Minute
+	response := waitForApproval(approvalReq.ID, timeout)
+
+	// Log audit
+	logAudit(map[string]interface{}{
+		"type":     "approval_decision",
+		"request_id": approvalReq.ID,
+		"method":   r.Method,
+		"host":     r.Host,
+		"path":     r.URL.Path,
+		"approved": response.Approved,
+		"reason":   response.Reason,
+	})
+
+	if !response.Approved {
+		log.Printf("Request denied: %s", response.Reason)
+		http.Error(w, fmt.Sprintf("Request denied: %s", response.Reason), http.StatusForbidden)
+		return false
+	}
+
+	log.Printf("Request approved: %s", response.Reason)
+	return true
 }

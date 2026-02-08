@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Feishu (Lark) approval: send approval requests to user or chat, poll for approve/deny reply; open_id cross-app fallback to chat_id
+- Default entry point: `main.go` builds to `diting` (Feishu approval); `main_ollama.go` for Ollama-only build
+- Audit query script: `cmd/diting/query_audit.sh` (--approved, --denied, -n)
+- Open-source readiness: `config.example.json`, `SECURITY.md`, `.gitignore` for config
+
+### Changed
+- Entry normalization: no _v2 naming; single default binary `diting` from `main.go`
+- `main_feishu_v2.go` renamed to `main_feishu_chat.go`
+- Docs and scripts updated to reference `diting` / `main.go` consistently
+
+### Documentation
+- `docs/DEVELOPMENT.md` - project structure, entry points, Go/Feishu conventions
+- `cmd/diting/QUICKSTART.md`, `FEISHU_TROUBLESHOOTING.md` - setup and troubleshooting
+
 ## [0.1.0] - 2026-02-05
 
 ### Added

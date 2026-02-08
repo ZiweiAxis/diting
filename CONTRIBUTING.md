@@ -33,7 +33,8 @@ We welcome feature suggestions! Please open an issue with:
    ```
 
 3. **Make your changes**
-   - Follow the existing code style
+   - Follow the existing code style and [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+   - Do not commit secrets (use `.env` or local config); keep `config.json` safe
    - Add tests if applicable
    - Update documentation
 
@@ -65,9 +66,9 @@ We welcome feature suggestions! Please open an issue with:
 - Add docstrings for functions and classes
 
 ### Go
-- Follow Go conventions
-- Run `go fmt` before committing
-- Add comments for exported functions
+- Follow [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for project structure, recommended entry points, and Feishu/approval conventions.
+- Follow Go conventions; run `go fmt` and `go vet ./...` before committing.
+- Add comments for exported functions.
 
 ## Commit Message Convention
 

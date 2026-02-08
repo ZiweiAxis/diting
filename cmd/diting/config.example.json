@@ -5,21 +5,21 @@
   },
   "llm": {
     "provider": "anthropic",
-    "base_url": "https://d01bad1e79ad-vip.aicoding.sh",
-    "api_key": "aicoding-617126d04e7745e2c593d78665552c7f",
+    "base_url": "https://your-llm-api.example.com",
+    "api_key": "your_llm_api_key",
     "model": "claude-haiku-3-5",
     "max_tokens": 1024,
     "temperature": 0.7
   },
   "feishu": {
     "enabled": true,
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo",
-    "approval_user_id": "ou_c06d8e07a92b69d09889a055cb6725bc",
+    "app_id": "your_feishu_app_id",
+    "app_secret": "your_feishu_app_secret",
+    "approval_user_id": "your_approval_user_id_or_leave_empty",
     "approval_timeout_minutes": 5,
-    "use_interactive_card": false,
     "use_message_reply": true,
-    "poll_interval_seconds": 2
+    "poll_interval_seconds": 2,
+    "chat_id": "your_feishu_chat_id_for_fallback"
   },
   "risk": {
     "dangerous_methods": ["DELETE", "PUT", "PATCH", "POST"],

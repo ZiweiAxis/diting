@@ -7,6 +7,11 @@
 - **位置:** E:\workspace\sentinel-ai
 - **状态:** ✅ 已完成
 
+### 飞书审批阶段（2026-02 更新）
+- **阶段总结与验证清单**：见 `_bmad-output/project-phase-summary-and-feishu-verification.md`
+- **推荐飞书入口**：`cmd/diting` 下 `go build -o diting main.go`，详见 `cmd/diting/QUICKSTART.md`
+- **最小验证步骤**：见 `_bmad-output/feishu-approval-minimal-verification.md`
+
 ---
 
 ## 📦 交付物清单

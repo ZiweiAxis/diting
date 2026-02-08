@@ -50,7 +50,19 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Local config (use config.example.json as template)
+cmd/diting/config.json
+cmd/diting/config.local.json
+
 # Logs
 logs/
 *.log
 logs/*.log
+cmd/diting/out_*.log
+
+# Built binaries (build with go build -o <name>)
+cmd/diting/diting
+cmd/diting/diting_ws
+cmd/diting/diting_ws_fixed
+cmd/diting/diting_feishu
+cmd/diting/diting_*

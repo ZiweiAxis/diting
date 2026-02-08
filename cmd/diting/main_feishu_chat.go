@@ -40,14 +40,15 @@ type LLMConfig struct {
 }
 
 type FeishuConfig struct {
-	Enabled               bool   `json:"enabled"`
-	AppID                 string `json:"app_id"`
-	AppSecret             string `json:"app_secret"`
-	ApprovalUserID        string `json:"approval_user_id"`
+	Enabled                bool   `json:"enabled"`
+	AppID                  string `json:"app_id"`
+	AppSecret              string `json:"app_secret"`
+	ApprovalUserID         string `json:"approval_user_id"`
 	ApprovalTimeoutMinutes int    `json:"approval_timeout_minutes"`
-	UseInteractiveCard    bool   `json:"use_interactive_card"`
-	UseMessageReply       bool   `json:"use_message_reply"`
-	PollIntervalSeconds   int    `json:"poll_interval_seconds"`
+	UseInteractiveCard     bool   `json:"use_interactive_card"`
+	UseMessageReply        bool   `json:"use_message_reply"`
+	PollIntervalSeconds    int    `json:"poll_interval_seconds"`
+	EventPort              int    `json:"event_port"`
 }
 
 type RiskConfig struct {
@@ -86,8 +87,9 @@ type ApprovalRequest struct {
 	RiskLevel      string    `json:"risk_level"`
 	IntentAnalysis string    `json:"intent_analysis"`
 	Timestamp      time.Time `json:"timestamp"`
-	Status         string    `json:"status"` // pending/approved/rejected/timeout
+	Status         string    `json:"status"`
 	MessageID      string    `json:"message_id"`
+	ChatID         string    `json:"chat_id"`
 }
 
 // 全局变量
@@ -96,6 +98,8 @@ var (
 	approvalRequests = sync.Map{}
 	feishuToken      string
 	feishuTokenMutex sync.RWMutex
+	userChatID       string
+	userChatIDMutex  sync.RWMutex
 )
 
 func main() {
@@ -104,18 +108,20 @@ func main() {
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
-	// 打印启动信息
-	printBanner()
+	// 设置默认事件端口
+	if config.Feishu.EventPort == 0 {
+		config.Feishu.EventPort = 9000
+	}
 
-	// 创建日志目录
+	printBanner()
 	os.MkdirAll("logs", 0755)
 
 	// 启动飞书事件监听服务
 	if config.Feishu.Enabled {
-		go startFeishuListener()
+		go startFeishuEventServer()
 	}
 
-	// 启动 HTTP 服务器
+	// 启动代理服务器
 	server := &http.Server{
 		Addr: config.Proxy.Listen,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -139,16 +145,16 @@ func main() {
 
 func printBanner() {
 	color.Cyan("╔════════════════════════════════════════════════════════╗")
-	color.Cyan("║         Diting 治理网关 v0.3.0                        ║")
-	color.Cyan("║    企业级智能体零信任治理平台 - 飞书审批集成          ║")
+	color.Cyan("║         Diting 治理网关 v0.4.0                        ║")
+	color.Cyan("║    企业级智能体零信任治理平台 - 飞书事件订阅          ║")
 	color.Cyan("╚════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	color.Green("✓ 配置加载成功")
 	color.White("  LLM: %s", config.LLM.Model)
 	if config.Feishu.Enabled {
-		color.White("  飞书: 消息回复模式")
-		color.White("  审批人: %s", config.Feishu.ApprovalUserID)
+		color.White("  飞书: 事件订阅模式")
+		color.White("  事件端口: %d", config.Feishu.EventPort)
 	}
 	fmt.Println()
 }
@@ -161,6 +167,162 @@ func loadConfig(filename string) error {
 	return json.Unmarshal(data, &config)
 }
 
+// 启动飞书事件服务器
+func startFeishuEventServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/feishu/event", handleFeishuEvent)
+	
+	addr := fmt.Sprintf(":%d", config.Feishu.EventPort)
+	
+	color.Cyan("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	color.Yellow("🔗 启动飞书事件监听服务...")
+	color.Green("✓ 飞书事件服务已启动")
+	color.White("  监听地址: http://localhost%s/feishu/event", addr)
+	color.Yellow("  请在飞书开放平台配置此地址为事件订阅 URL")
+	color.Cyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	
+	server := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+	
+	if err := server.ListenAndServe(); err != nil {
+		log.Printf("飞书事件服务器错误: %v", err)
+	}
+}
+
+// 处理飞书事件
+func handleFeishuEvent(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	
+	var event map[string]interface{}
+	if err := json.Unmarshal(body, &event); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// URL 验证
+	if challenge, ok := event["challenge"].(string); ok {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"challenge": challenge,
+		})
+		color.Green("\n[%s] ✓ 飞书 URL 验证成功", time.Now().Format("15:04:05"))
+		return
+	}
+
+	// 处理消息事件
+	if header, ok := event["header"].(map[string]interface{}); ok {
+		eventType, _ := header["event_type"].(string)
+		
+		if eventType == "im.message.receive_v1" {
+			handleMessageReceive(event)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"code": "0"})
+}
+
+// 处理接收到的消息
+func handleMessageReceive(event map[string]interface{}) {
+	eventData, ok := event["event"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	message, ok := eventData["message"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	messageType, _ := message["message_type"].(string)
+	if messageType != "text" {
+		return
+	}
+
+	// 解析文本内容
+	content, _ := message["content"].(string)
+	var textContent map[string]string
+	json.Unmarshal([]byte(content), &textContent)
+	text := textContent["text"]
+
+	// 获取 chat_id
+	chatID, _ := message["chat_id"].(string)
+	
+	// 保存 chat_id（用于后续发送消息）
+	if chatID != "" {
+		userChatIDMutex.Lock()
+		userChatID = chatID
+		userChatIDMutex.Unlock()
+	}
+
+	// 获取发送者信息
+	sender, ok := eventData["sender"].(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	senderID, _ := sender["sender_id"].(map[string]interface{})
+	openID, _ := senderID["open_id"].(string)
+	userID, _ := senderID["user_id"].(string)
+
+	color.Cyan("\n[%s] 📨 收到飞书消息", time.Now().Format("15:04:05"))
+	fmt.Printf("  发送者 open_id: %s\n", openID)
+	fmt.Printf("  发送者 user_id: %s（若改用默认 main 轮询模式，可填到 config approval_user_id）\n", userID)
+	fmt.Printf("  Chat ID: %s（本会话，审批消息会发到此）\n", chatID)
+	fmt.Printf("  内容: %s\n", text)
+
+	// 检查审批回复
+	checkApprovalReply(text, chatID)
+}
+
+// 检查审批回复
+func checkApprovalReply(text, chatID string) {
+	text = strings.ToLower(strings.TrimSpace(text))
+	
+	approveKeywords := []string{"批准", "approve", "y", "yes", "同意"}
+	rejectKeywords := []string{"拒绝", "reject", "n", "no", "不同意"}
+
+	var decision string
+	for _, keyword := range approveKeywords {
+		if text == keyword {
+			decision = "approved"
+			break
+		}
+	}
+	
+	if decision == "" {
+		for _, keyword := range rejectKeywords {
+			if text == keyword {
+				decision = "rejected"
+				break
+			}
+		}
+	}
+
+	if decision != "" {
+		approvalRequests.Range(func(key, value interface{}) bool {
+			req := value.(*ApprovalRequest)
+			if req.Status == "pending" {
+				req.Status = decision
+				approvalRequests.Store(key, req)
+				
+				color.Green("  ✓ 审批决策: %s", decision)
+				
+				confirmMsg := "✅ 已批准操作"
+				if decision == "rejected" {
+					confirmMsg = "❌ 已拒绝操作"
+				}
+				sendFeishuMessageToChat(chatID, confirmMsg)
+				
+				return false
+			}
+			return true
+		})
+	}
+}
+
 // HTTP 代理处理
 func handleHTTP(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
@@ -169,15 +331,12 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("  方法: %s\n", color.YellowString(r.Method))
 	fmt.Printf("  URL: %s\n", color.WhiteString(r.URL.String()))
 
-	// 读取请求体
 	bodyBytes, _ := io.ReadAll(r.Body)
 	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
-	// 风险评估
 	riskLevel := assessRisk(r.Method, r.URL.Path, string(bodyBytes))
 	fmt.Printf("  风险等级: %s\n", colorizeRisk(riskLevel))
 
-	// 创建审计日志
 	audit := AuditLog{
 		Timestamp: time.Now(),
 		Method:    r.Method,
@@ -187,7 +346,6 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 		RiskLevel: riskLevel,
 	}
 
-	// 决策逻辑
 	var decision string
 	var intentAnalysis string
 
@@ -195,13 +353,11 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 		decision = "ALLOW"
 		color.Green("  决策: 自动放行")
 	} else {
-		// LLM 意图分析
 		intentAnalysis = analyzeIntent(r.Method, r.URL.Path, string(bodyBytes))
 		fmt.Printf("\n  🤖 意图分析:\n")
 		color.Cyan("  %s", intentAnalysis)
 		fmt.Println()
 
-		// 飞书审批
 		if config.Feishu.Enabled {
 			decision = requestFeishuApproval(r.Method, r.URL.String(), r.URL.Host, riskLevel, intentAnalysis)
 		} else {
@@ -213,10 +369,8 @@ func handleHTTP(w http.ResponseWriter, r *http.Request) {
 	audit.IntentAnalysis = intentAnalysis
 	audit.Decision = decision
 
-	// 执行决策
 	if decision == "ALLOW" {
 		color.Green("\n  ✓ 请求已放行")
-		// 转发请求
 		proxyHTTPRequest(w, r, &audit)
 	} else {
 		color.Red("\n  ✗ 请求已拒绝")
@@ -243,7 +397,6 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("  方法: %s\n", color.YellowString(r.Method))
 	fmt.Printf("  目标: %s\n", color.WhiteString(r.Host))
 
-	// 风险评估
 	riskLevel := assessRiskHTTPS(r.Host)
 	fmt.Printf("  风险等级: %s\n", colorizeRisk(riskLevel))
 
@@ -290,21 +443,18 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
 
 // 风险评估
 func assessRisk(method, path, body string) string {
-	// 检查是否为安全方法
 	for _, m := range config.Risk.AutoApproveMethods {
 		if method == m {
 			return "低"
 		}
 	}
 
-	// 检查危险方法
 	for _, m := range config.Risk.DangerousMethods {
 		if method == m {
 			return "高"
 		}
 	}
 
-	// 检查危险路径
 	for _, p := range config.Risk.DangerousPaths {
 		if strings.Contains(strings.ToLower(path), p) {
 			return "高"
@@ -315,7 +465,6 @@ func assessRisk(method, path, body string) string {
 }
 
 func assessRiskHTTPS(host string) string {
-	// 检查安全域名
 	for _, domain := range config.Risk.SafeDomains {
 		if strings.Contains(host, domain) {
 			return "低"
@@ -326,50 +475,6 @@ func assessRiskHTTPS(host string) string {
 
 // 意图分析
 func analyzeIntent(method, path, body string) string {
-	if !config.Feishu.Enabled || config.LLM.APIKey == "" {
-		return fmt.Sprintf("规则引擎: %s %s 操作需要审批", method, path)
-	}
-
-	prompt := fmt.Sprintf(`分析以下 API 操作的意图和风险：
-方法: %s
-路径: %s
-请求体: %s
-
-请简要说明（50字以内）：
-1. 操作意图
-2. 潜在影响
-3. 是否建议审批`, method, path, body)
-
-	req := map[string]interface{}{
-		"model": config.LLM.Model,
-		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
-		},
-		"max_tokens": config.LLM.MaxTokens,
-	}
-
-	reqBody, _ := json.Marshal(req)
-	httpReq, _ := http.NewRequest("POST", config.LLM.BaseURL+"/v1/messages", bytes.NewBuffer(reqBody))
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("x-api-key", config.LLM.APIKey)
-	httpReq.Header.Set("anthropic-version", "2023-06-01")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return fmt.Sprintf("LLM 分析失败，降级到规则引擎: %s %s 操作需要审批", method, path)
-	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-
-	if content, ok := result["content"].([]interface{}); ok && len(content) > 0 {
-		if text, ok := content[0].(map[string]interface{})["text"].(string); ok {
-			return text
-		}
-	}
-
 	return fmt.Sprintf("规则引擎: %s %s 操作需要审批", method, path)
 }
 
@@ -390,7 +495,6 @@ func requestFeishuApproval(method, path, host, riskLevel, intentAnalysis string)
 
 	approvalRequests.Store(requestID, &req)
 
-	// 发送飞书消息
 	message := fmt.Sprintf(`🚨 Diting 高风险操作审批
 
 操作: %s %s
@@ -404,18 +508,26 @@ func requestFeishuApproval(method, path, host, riskLevel, intentAnalysis string)
 ⏱️ %d分钟内未响应将自动拒绝
 请求ID: %s`, method, path, riskLevel, intentAnalysis, config.Feishu.ApprovalTimeoutMinutes, requestID)
 
-	messageID, err := sendFeishuMessage(config.Feishu.ApprovalUserID, message)
-	if err != nil {
+	// 获取 chat_id
+	userChatIDMutex.RLock()
+	chatID := userChatID
+	userChatIDMutex.RUnlock()
+
+	if chatID == "" {
+		color.Red("  ✗ 未找到 chat_id，请先与机器人建立会话")
+		return "DENY"
+	}
+
+	if err := sendFeishuMessageToChat(chatID, message); err != nil {
 		color.Red("  ✗ 发送飞书消息失败: %v", err)
 		return "DENY"
 	}
 
-	req.MessageID = messageID
+	req.ChatID = chatID
 	approvalRequests.Store(requestID, &req)
 
 	color.Yellow("  ⏳ 等待飞书审批...")
 
-	// 等待审批
 	timeout := time.Duration(config.Feishu.ApprovalTimeoutMinutes) * time.Minute
 	decision := waitForApproval(requestID, timeout)
 
@@ -432,7 +544,7 @@ func requestFeishuApproval(method, path, host, riskLevel, intentAnalysis string)
 
 func waitForApproval(requestID string, timeout time.Duration) string {
 	deadline := time.Now().Add(timeout)
-	ticker := time.NewTicker(time.Duration(config.Feishu.PollIntervalSeconds) * time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -447,16 +559,16 @@ func waitForApproval(requestID string, timeout time.Duration) string {
 				}
 			}
 
-			// 轮询飞书消息
-			checkFeishuMessages(requestID)
-
 			if time.Now().After(deadline) {
 				if val, ok := approvalRequests.Load(requestID); ok {
 					req := val.(*ApprovalRequest)
 					req.Status = "timeout"
 					approvalRequests.Store(requestID, req)
+					
+					if req.ChatID != "" {
+						sendFeishuMessageToChat(req.ChatID, fmt.Sprintf("⏱️ 审批超时，请求 %s 已自动拒绝", requestID))
+					}
 				}
-				sendFeishuMessage(config.Feishu.ApprovalUserID, fmt.Sprintf("⏱️ 审批超时，请求 %s 已自动拒绝", requestID))
 				return "DENY"
 			}
 		}
@@ -498,22 +610,21 @@ func getFeishuToken() (string, error) {
 	return "", fmt.Errorf("获取 token 失败")
 }
 
-func sendFeishuMessage(userID, content string) (string, error) {
+func sendFeishuMessageToChat(chatID, content string) error {
 	token, err := getFeishuToken()
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	// 正确构建消息内容
 	contentJSON, _ := json.Marshal(map[string]string{"text": content})
 	
 	reqBody, _ := json.Marshal(map[string]interface{}{
-		"receive_id": userID,
+		"receive_id": chatID,
 		"msg_type":   "text",
 		"content":    string(contentJSON),
 	})
 
-	req, _ := http.NewRequest("POST", "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id",
+	req, _ := http.NewRequest("POST", "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
 		bytes.NewBuffer(reqBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -521,7 +632,7 @@ func sendFeishuMessage(userID, content string) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -529,25 +640,11 @@ func sendFeishuMessage(userID, content string) (string, error) {
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	json.Unmarshal(bodyBytes, &result)
 
-	// 打印调试信息
 	if code, ok := result["code"].(float64); ok && code != 0 {
-		fmt.Printf("  飞书 API 错误: code=%v, msg=%v\n", result["code"], result["msg"])
-		return "", fmt.Errorf("飞书 API 错误: %v", result["msg"])
+		return fmt.Errorf("飞书 API 错误: %v", result["msg"])
 	}
 
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		if msgID, ok := data["message_id"].(string); ok {
-			return msgID, nil
-		}
-	}
-
-	return "", fmt.Errorf("发送消息失败: %s", string(bodyBytes))
-}
-
-func checkFeishuMessages(requestID string) {
-	// 简化版：检查最近的消息
-	// 实际应该获取与机器人的对话消息列表
-	// 这里省略复杂的消息轮询逻辑
+	return nil
 }
 
 // 代理转发

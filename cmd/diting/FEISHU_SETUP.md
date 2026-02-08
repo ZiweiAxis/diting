@@ -77,13 +77,13 @@
 ```bash
 cd /home/dministrator/workspace/sentinel-ai/cmd/diting
 export PATH=$HOME/go/bin:$PATH
-go build -o diting_v2 main_v2.go
+go build -o diting main.go
 ```
 
 ### 2. 启动服务
 
 ```bash
-./diting_v2
+./diting
 ```
 
 你会看到：
@@ -108,7 +108,7 @@ go build -o diting_v2 main_v2.go
 
 **终端 1**（启动 Diting）：
 ```bash
-./diting_v2
+./diting
 ```
 
 **终端 2**（发起高风险操作）：
