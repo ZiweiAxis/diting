@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"diting/internal/cheq"
 	"diting/internal/config"
 
 	"github.com/larksuite/oapi-sdk-go/v3/event/dispatcher"
@@ -59,18 +60,76 @@ func runWSLoop(ctx context.Context, cfg config.FeishuConfig, onCardAction func(c
 // handleWSCardAction 处理 SDK 事件里的卡片点击（event_type=card.action.trigger），不走 HTTP 回调。
 func handleWSCardAction(value map[string]interface{}, onCardAction func(cheqID string, approved bool) error) *callback.CardActionTriggerResponse {
 	if value == nil {
-		return &callback.CardActionTriggerResponse{}
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "info", Content: "忽略"},
+		}
 	}
 	requestID, _ := value["request_id"].(string)
 	actionStr, _ := value["action"].(string)
 	if requestID == "" || actionStr == "" {
-		return &callback.CardActionTriggerResponse{}
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "warning", Content: "缺少 request_id"},
+		}
 	}
 	approved := actionStr == "approve"
 	if err := onCardAction(requestID, approved); err != nil {
 		fmt.Fprintf(os.Stderr, "[diting] 飞书卡片审批 Submit: %v\n", err)
-		return &callback.CardActionTriggerResponse{}
+		if err == cheq.ErrNotFound {
+			return &callback.CardActionTriggerResponse{
+				Toast: &callback.Toast{Type: "warning", Content: "未找到该请求"},
+				Card:  buildResultCard("未找到", requestID),
+			}
+		}
+		if err == cheq.ErrExpired {
+			return &callback.CardActionTriggerResponse{
+				Toast: &callback.Toast{Type: "warning", Content: "该请求已过期"},
+				Card:  buildResultCard("已过期", requestID),
+			}
+		}
+		if err == cheq.ErrAlreadyProcessed {
+			return &callback.CardActionTriggerResponse{
+				Toast: &callback.Toast{Type: "warning", Content: "该请求已处理"},
+				Card:  buildResultCard("已处理", requestID),
+			}
+		}
+		return &callback.CardActionTriggerResponse{
+			Toast: &callback.Toast{Type: "error", Content: "处理失败"},
+		}
+	}
+	status := "已拒绝"
+	if approved {
+		status = "已批准"
 	}
 	fmt.Fprintf(os.Stderr, "[diting] 飞书长连接卡片审批: id=%s approved=%v (event_type=%s)\n", requestID, approved, "card.action.trigger")
-	return &callback.CardActionTriggerResponse{}
+	return &callback.CardActionTriggerResponse{
+		Toast: &callback.Toast{Type: "success", Content: status},
+		Card:  buildResultCard(status, requestID),
+	}
+}
+
+func buildResultCard(status, requestID string) *callback.Card {
+	card := map[string]interface{}{
+		"config": map[string]interface{}{
+			"wide_screen_mode": true,
+		},
+		"header": map[string]interface{}{
+			"title": map[string]interface{}{
+				"tag":     "plain_text",
+				"content": "Diting 审批结果",
+			},
+		},
+		"elements": []interface{}{
+			map[string]interface{}{
+				"tag": "div",
+				"text": map[string]interface{}{
+					"tag":     "lark_md",
+					"content": fmt.Sprintf("状态: **%s**\nID: `%s`", status, requestID),
+				},
+			},
+		},
+	}
+	return &callback.Card{
+		Type: "raw",
+		Data: card,
+	}
 }
