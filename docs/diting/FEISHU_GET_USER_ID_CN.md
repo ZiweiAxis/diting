@@ -48,7 +48,7 @@ ngrok http 9000
 
 ## 3. 在飞书开放平台配置事件订阅（HTTP 回调方式）
 
-1. 打开 [飞书开放平台](https://open.feishu.cn/app) → 进入你的应用（与 config.json 里 app_id 一致）。
+1. 打开 [飞书开放平台](https://open.feishu.cn/app) → 进入你的应用（与 .env 里 DITING_FEISHU_APP_ID 一致）。
 2. 左侧 **事件订阅** → 若你使用 **长连接**，无需配置请求地址，从长连接事件即可获取 user_id；若使用 **HTTP 回调**，在 **请求地址** 填：  
    `https://xxxx.ngrok.io/feishu/event`（把 `xxxx.ngrok.io` 换成你的 ngrok 地址）。
 3. 点击 **保存**（HTTP 回调时），飞书会发一次验证请求；监听服务终端应出现：`[OK] 飞书请求地址验证已通过`。
@@ -74,12 +74,12 @@ ngrok http 9000
   user_id:  xxxxxxxxx
 ----------------------------------------
   建议：为避免 open_id cross app(99992361)，请使用 user_id
-  1. config.json 或 .env 中设置 approval_user_id = 上面的 user_id
-  2. 设置 receive_id_type = user_id
+  1. .env 中设置 DITING_FEISHU_APPROVAL_USER_ID = 上面的 user_id
+  2. 设置 DITING_FEISHU_RECEIVE_ID_TYPE=user_id
 ========================================
 ```
 
-把 **user_id** 填到 `config.json` 的 `feishu.approval_user_id`，并设置 `receive_id_type: user_id`（或环境变量 `DITING_FEISHU_RECEIVE_ID_TYPE=user_id`），即可用该用户收审批消息。
+把 **user_id** 填到 **.env** 的 `DITING_FEISHU_APPROVAL_USER_ID`，并设置 `DITING_FEISHU_RECEIVE_ID_TYPE=user_id`，即可用该用户收审批消息。
 
 ---
 

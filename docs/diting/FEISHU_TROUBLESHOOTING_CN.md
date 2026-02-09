@@ -65,7 +65,7 @@ go build -o diting main.go && ./diting
 
 ## 6. 配置检查
 
-`config.json` 中：
+**.env 或 config.yaml** 中：
 
-- `feishu.approval_user_id`：**推荐填 user_id**（本应用下），避免「open_id cross app」。不要填 chat_id（`oc_xxx`）。
-- `feishu.enabled`：`true`。
+- `DITING_FEISHU_APPROVAL_USER_ID`（或 YAML `delivery.feishu.approval_user_id`）：**推荐填 user_id**（本应用下），避免「open_id cross app」。不要填 chat_id（`oc_xxx`）。
+- 飞书投递启用：YAML `delivery.feishu.enabled: true` 或通过 .env 覆盖。

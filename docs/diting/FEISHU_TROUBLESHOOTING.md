@@ -59,7 +59,7 @@ After triggering one high-risk request, check the terminal:
   cd cmd/diting
   go run get_feishu_user_id.go
   ```
-  In Feishu open platform → Event subscription → set request URL to `http://your-public-url/feishu/event` (e.g. expose port 9000 with ngrok). Send one message to the app; the terminal prints **user_id**. Copy it to `config.json` → `feishu.approval_user_id`.
+  In Feishu open platform → Event subscription → set request URL to `http://your-public-url/feishu/event` (e.g. expose port 9000 with ngrok). Send one message to the app; the terminal prints **user_id**. Copy it to `.env` → `DITING_FEISHU_APPROVAL_USER_ID`.
 - Or: In [Feishu admin](https://open.feishu.cn/app) → your app → Directory/permissions → get user user_id;
 - Or: Use Feishu API to [get user_id by phone/email](https://open.feishu.cn/document/server-docs/contact-v3/user/batch_get_id).
 
@@ -67,7 +67,7 @@ After setting **user_id** in config, the code uses `receive_id_type=user_id` and
 
 ## 6. Config checklist
 
-In `config.json`:
+In `.env` or `config.yaml`:
 
 - `feishu.approval_user_id`: **use user_id** (for this app) to avoid "open_id cross app". Do not use chat_id (`oc_xxx`).
 - `feishu.enabled`: `true`.

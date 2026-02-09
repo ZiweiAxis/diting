@@ -8,7 +8,7 @@
 |------|-------------|
 | **Entry file** | `main.go` |
 | **Binary** | `diting` |
-| **Config** | In `config.json`, `feishu` must include: `enabled`, `app_id`, `app_secret`, **`approval_user_id`** (approver user_id), `approval_timeout_minutes`, **`use_message_reply`: true**, **`poll_interval_seconds`** (e.g. 2) |
+| **Config** | Use `config.yaml` + `.env`; set `DITING_FEISHU_*` in `.env`. See CONFIG_LAYERS.md |
 | **Reply** | Approval messages go to the approver's DM; approver replies in Feishu with "approve & requestID" or "deny & requestID" |
 
 Other entries:
@@ -40,11 +40,11 @@ Or build the group+long-connection variant (requires Feishu "long connection"):
 go build -o diting main_complete.go
 ```
 
-## Step 2b: Configure config.json (required for Feishu)
+## Step 2b: Configure config.yaml + .env (required for Feishu)
 
-First time: copy `config.example.json` to `config.json`, then fill in your `app_id`, `app_secret`, etc. (do not commit `config.json` with secrets).
+First time: `cp config.example.yaml config.yaml`, `cp .env.example .env`, then fill in `DITING_FEISHU_APP_ID`, `DITING_FEISHU_APP_SECRET`, `DITING_FEISHU_APPROVAL_USER_ID` in `.env` (do not commit `.env`).
 
-Ensure the Feishu section in `config.json` includes:
+Ensure `.env` includes:
 
 ```json
 "feishu": {
@@ -109,7 +109,7 @@ Approval messages are sent to the Feishu DM of `approval_user_id`. In Feishu, re
 ### 1. Using default diting (recommended)
 
 - Get **app_id** and **app_secret** from Feishu open platform.
-- Get the approver's **user_id** (admin console or API) and set `approval_user_id` in `config.json`.
+- Get the approver's **user_id** (admin console or API) and set `DITING_FEISHU_APPROVAL_USER_ID` in `.env`.
 - No need to enable "long connection" or configure a public callback.
 
 ### 2. Using main_complete (group + long connection)
@@ -174,7 +174,7 @@ response = requests.get('https://api.example.com', proxies=proxies)
 
 ## Customization
 
-Edit `config.json` for: proxy port, risk rules, approval timeout, audit log path. Restart to apply.
+Edit `config.yaml` and `.env` for: proxy port, risk rules, approval timeout, audit log path. Restart to apply.
 
 ## Verification checklist
 

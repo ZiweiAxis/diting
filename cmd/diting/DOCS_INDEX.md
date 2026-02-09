@@ -1,36 +1,39 @@
 # Diting 文档索引
 
-收敛说明：飞书与验收相关以以下为主，其余为历史或专项参考，可按需查阅。
+**本目录**只保留运行与验收必需的最少文档；其余已迁到 **docs/diting/**。  
+**规划 / Epic / 验收** 以仓库 **\_bmad-output/** 为准（BMAD 产出）。
 
 ---
 
-## 主要文档（优先看）
+## 本目录（优先看）
 
 | 文档 | 用途 |
 |------|------|
-| **ACCEPTANCE_CHECKLIST.md** | 闭环验收检查单（策略→卡片→长连接点击→放行/拒绝） |
-| **run_acceptance.sh** | 验收脚本：`start` 启动服务 / `trigger` 触发审批 / `stop` 停止 |
-| **VERIFY_CARD.md** | 交互卡片验证步骤（发卡片、点按钮、200340 排查） |
-| **FEISHU_LONG_CONNECTION_CARD.md** | 长连接 + 卡片：只走 WebSocket（card.action.trigger），不填 request_url |
-| **QUICKSTART_DOCKER.md** | 容器 15 分钟快速开始（Dockerfile.diting + 运行与验证） |
-| **DNS_MODE.md** | 双接入：Proxy 与 DNS 模式说明与验证 |
-| **config.example.yaml** | 配置模板（复制为 config.yaml 使用）；敏感项用 .env |
-| **README.md** | 项目入口与构建说明 |
-| **.air.toml** | Watch 模式配置（改代码自动重新编译并重启）；使用：仓库根 `make watch` 或本目录 `air`，需先安装 air |
-| **CONFIG_LAYERS.md** | config.yaml / config.json / .env 关系、加载顺序与收敛说明 |
+| **README.md** | 入口：构建、运行、配置与 BMAD 说明 |
+| **CONFIG_LAYERS.md** | config.yaml + .env 关系与首次使用 |
+| **DEV_WATCH.md** | Watch 模式（make watch / air） |
+| **ACCEPTANCE_CHECKLIST.md** | 闭环验收检查单（策略→飞书卡片→放行/拒绝） |
+| **MAIN_ENTRIES.md** | 入口说明（推荐 All-in-One，已清理多余 main_*.go） |
+| **run_acceptance.sh**、**trigger_review.sh**、**query_audit.sh** | 验收与审计脚本（本目录） |
+| **config.example.yaml**、**.env.example** | 配置模板（复制为 config.yaml、.env 后本地使用，不提交） |
+| **policy_rules.example.yaml** | 策略规则示例（可选，见 policy.rules_path） |
+| **scripts/** | 可选脚本：install-dev-deps.sh、test.sh、test_feishu.sh、run-with-feishu.sh；临时验证脚本已迁 _temp/diting/，见 scripts/README.md |
 
 ---
 
-## 参考 / 历史（按需）
+## 本目录不提交/仅本地
 
-| 文档 | 说明 |
+以下由 .gitignore 忽略，不提交：**config.yaml**、**.env**、**bin/**（构建产物）、**data/**（审计/CHEQ 数据）、**tmp/**（air 临时）。仓库级 **\_process_docs/**、**\_temp/** 见下表。
+
+---
+
+## 其他文档位置
+
+| 位置 | 内容 |
 |------|------|
-| FEISHU_SETUP.md | 飞书应用与权限配置 |
-| FEISHU_APPROVAL_FLOW_CN.md | 审批流程说明 |
-| FEISHU_GET_USER_ID_CN.md | 获取 user_id（HTTP 回调方式示例） |
-| FEISHU_TROUBLESHOOTING_CN.md | 飞书问题排查（中文） |
-| QUICKSTART_CN.md / QUICKSTART.md | 快速开始 |
-| DELIVERY.md | 投递机制说明 |
-| README_QUICK_START.md / README_FEISHU.md / README_COMPLETE.md | 其他 README 变体 |
+| **docs/diting/** | 快速开始、飞书配置与排查、交付总结、历史 README、过程性报告等 |
+| **\_bmad-output/** | PRD、Epics、Architecture、Acceptance（BMAD） |
+| **\_process_docs/** | 过程性文档（不提交）：验收报告、修复记录、交付总结等，今后此类文档统一放此目录 |
+| **\_temp/** | 临时性工具/脚本（不提交）：如获取飞书 user_id 的独立脚本等，与过程文档同方式、统一放此目录 |
 
-过程性文档（FEISHU_INTEGRATION、FEISHU_WEBSOCKET_FIX、TEST_REPORT 等）需时再查即可。
+详见 [docs/diting/README.md](../../docs/diting/README.md)。

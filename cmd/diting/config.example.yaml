@@ -32,3 +32,17 @@ audit:
 
 ownership:
   static_map: {}
+
+# 以下供 main_feishu / main 等入口使用（All-in-One 可忽略）；敏感项由 .env 覆盖
+llm:
+  provider: anthropic
+  base_url: ""
+  api_key: ""
+  model: ""
+  max_tokens: 1024
+  temperature: 0.7
+risk:
+  dangerous_methods: ["DELETE", "PUT", "PATCH", "POST"]
+  dangerous_paths: ["/delete", "/remove", "/drop", "/destroy", "/clear", "/admin", "/production"]
+  auto_approve_methods: ["GET", "HEAD", "OPTIONS"]
+  safe_domains: ["api.github.com", "httpbin.org"]

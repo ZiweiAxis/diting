@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -185,12 +184,18 @@ var (
 // ============================================================================
 
 func main() {
-	// 先加载 .env，再用环境变量覆盖 config
+	// 配置：.env + config.yaml（与 All-in-One 一致，已移除 config.json）
 	_ = configpkg.LoadEnvFile(".env", true)
-	if err := loadConfig("/home/dministrator/workspace/sentinel-ai/cmd/diting/config.json"); err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	configPath := "config.yaml"
+	if _, err := os.Stat(configPath); err != nil {
+		configPath = "config.example.yaml"
 	}
-	applyEnvOverrides()
+	cfg, err := configpkg.Load(configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v (ensure config.yaml or config.example.yaml exists)", err)
+	}
+	config = mainConfigFromUnified(cfg)
+	log.Printf("Configuration loaded successfully")
 
 	// Initialize audit logging
 	if config.Audit.Enabled {
@@ -221,56 +226,44 @@ func main() {
 // Configuration Loading
 // ============================================================================
 
-func loadConfig(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read config file: %w", err)
+// mainConfigFromUnified 从统一配置 config.yaml（含 env 覆盖）映射为 main 的 Config。
+func mainConfigFromUnified(cfg *configpkg.Config) Config {
+	out := Config{
+		Proxy: ProxyConfig{Listen: cfg.Proxy.ListenAddr, TimeoutSeconds: 30},
+		Feishu: FeishuConfig{
+			Enabled:                cfg.Delivery.Feishu.Enabled,
+			AppID:                  cfg.Delivery.Feishu.AppID,
+			AppSecret:              cfg.Delivery.Feishu.AppSecret,
+			ApprovalUserID:         cfg.Delivery.Feishu.ApprovalUserID,
+			ChatID:                 cfg.Delivery.Feishu.ChatID,
+			ApprovalTimeoutMinutes: cfg.Delivery.Feishu.ApprovalTimeoutMinutes,
+			UseMessageReply:        cfg.Delivery.Feishu.UseMessageReply,
+			PollIntervalSeconds:    cfg.Delivery.Feishu.PollIntervalSeconds,
+		},
+		Audit: AuditConfig{LogFile: cfg.Audit.Path, Enabled: cfg.Audit.Path != ""},
 	}
-
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("parse config: %w", err)
-	}
-
-	log.Printf("Configuration loaded successfully")
-	return nil
-}
-
-// applyEnvOverrides 用 .env 中的 DITING_LLM_*、DITING_FEISHU_* 覆盖已加载的 config。
-func applyEnvOverrides() {
-	if v := os.Getenv("DITING_LLM_BASE_URL"); v != "" {
-		config.LLM.BaseURL = v
-	}
-	if v := os.Getenv("DITING_LLM_API_KEY"); v != "" {
-		config.LLM.APIKey = v
-	}
-	if v := os.Getenv("DITING_LLM_MODEL"); v != "" {
-		config.LLM.Model = v
-	}
-	if v := os.Getenv("DITING_LLM_PROVIDER"); v != "" {
-		config.LLM.Provider = v
-	}
-	if v := os.Getenv("DITING_LLM_MAX_TOKENS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			config.LLM.MaxTokens = n
+	if cfg.LLM != nil {
+		out.LLM = LLMConfig{
+			Provider:    cfg.LLM.Provider,
+			BaseURL:     cfg.LLM.BaseURL,
+			APIKey:      cfg.LLM.APIKey,
+			Model:       cfg.LLM.Model,
+			MaxTokens:   cfg.LLM.MaxTokens,
+			Temperature: cfg.LLM.Temperature,
 		}
 	}
-	if v := os.Getenv("DITING_LLM_TEMPERATURE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			config.LLM.Temperature = f
+	if cfg.Risk != nil {
+		out.Risk = RiskConfig{
+			DangerousMethods:   cfg.Risk.DangerousMethods,
+			DangerousPaths:     cfg.Risk.DangerousPaths,
+			AutoApproveMethods: cfg.Risk.AutoApproveMethods,
+			SafeDomains:        cfg.Risk.SafeDomains,
 		}
 	}
-	if v := os.Getenv("DITING_FEISHU_APP_ID"); v != "" {
-		config.Feishu.AppID = v
+	if out.LLM.MaxTokens == 0 {
+		out.LLM.MaxTokens = 1024
 	}
-	if v := os.Getenv("DITING_FEISHU_APP_SECRET"); v != "" {
-		config.Feishu.AppSecret = v
-	}
-	if v := os.Getenv("DITING_FEISHU_APPROVAL_USER_ID"); v != "" {
-		config.Feishu.ApprovalUserID = v
-	}
-	if v := os.Getenv("DITING_FEISHU_CHAT_ID"); v != "" {
-		config.Feishu.ChatID = v
-	}
+	return out
 }
 
 // ============================================================================

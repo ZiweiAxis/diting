@@ -1,14 +1,35 @@
 // Package config 提供统一配置模型与加载（YAML + env override）。
 package config
 
-// Config 根配置；敏感项由 env 覆盖（见 Load）。
+// Config 根配置；敏感项由 env 覆盖（见 Load）。All-in-One 与 main/main_feishu 等入口共用。
 type Config struct {
-	Proxy   ProxyConfig   `yaml:"proxy"`
-	Policy  PolicyConfig  `yaml:"policy"`
-	CHEQ    CHEQConfig    `yaml:"cheq"`
+	Proxy    ProxyConfig    `yaml:"proxy"`
+	Policy   PolicyConfig  `yaml:"policy"`
+	CHEQ     CHEQConfig    `yaml:"cheq"`
 	Delivery DeliveryConfig `yaml:"delivery"`
-	Audit   AuditConfig   `yaml:"audit"`
+	Audit    AuditConfig   `yaml:"audit"`
 	Ownership OwnershipConfig `yaml:"ownership"`
+	// 以下供 main_feishu / main 等入口使用（YAML 可选段）
+	LLM  *LLMConfig  `yaml:"llm,omitempty"`
+	Risk *RiskConfig `yaml:"risk,omitempty"`
+}
+
+// LLMConfig 大模型配置（main_feishu 等用）。
+type LLMConfig struct {
+	Provider    string  `yaml:"provider"`
+	BaseURL     string  `yaml:"base_url"`
+	APIKey      string  `yaml:"api_key"`
+	Model       string  `yaml:"model"`
+	MaxTokens   int     `yaml:"max_tokens"`
+	Temperature float64 `yaml:"temperature"`
+}
+
+// RiskConfig 风险规则（main_feishu 等用）。
+type RiskConfig struct {
+	DangerousMethods   []string `yaml:"dangerous_methods"`
+	DangerousPaths     []string `yaml:"dangerous_paths"`
+	AutoApproveMethods []string `yaml:"auto_approve_methods"`
+	SafeDomains        []string `yaml:"safe_domains"`
 }
 
 // ProxyConfig 代理监听与上游。
@@ -33,7 +54,7 @@ type DeliveryConfig struct {
 	Feishu FeishuConfig `yaml:"feishu"`
 }
 
-// FeishuConfig 飞书应用配置；与 cmd/diting/config.json 的 feishu 对齐，敏感项从 env 覆盖。
+// FeishuConfig 飞书应用配置；敏感项从 env 覆盖。
 type FeishuConfig struct {
 	AppID                  string `yaml:"app_id"`
 	AppSecret              string `yaml:"app_secret"` // 实际从 DITING_FEISHU_APP_SECRET 覆盖

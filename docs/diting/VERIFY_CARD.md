@@ -13,7 +13,7 @@
 
 ```bash
 cd /home/dministrator/workspace/sentinel-ai/cmd/diting
-# 若用 config.json 注入飞书配置，会先读 config.json 再读 YAML
+# 主流程与 main/main_feishu 均使用 config.yaml + .env，已移除 config.json
 go run ./cmd/diting_allinone/
 ```
 

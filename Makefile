@@ -3,12 +3,17 @@
 DITING_DIR := cmd/diting
 BINARY := $(DITING_DIR)/bin/diting
 
-.PHONY: build run watch watch-entr docker-diting
+.PHONY: build run watch watch-entr clean docker-diting
 build:
 	cd $(DITING_DIR) && go build -o bin/diting ./cmd/diting_allinone
 
 run: build
 	cd $(DITING_DIR) && ./bin/diting
+
+# 清理 diting 构建产物（bin/ 及 cmd/diting 根目录残留）
+clean:
+	rm -rf $(DITING_DIR)/bin/
+	rm -f $(DITING_DIR)/diting $(DITING_DIR)/diting-* $(DITING_DIR)/diting_*
 
 # Watch 模式（优先 air）：代码/配置变更自动重新编译并重启（自动带 $HOME/go/bin）
 watch:

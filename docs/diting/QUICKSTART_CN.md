@@ -8,7 +8,7 @@
 |------|------|
 | **入口文件** | `main.go` |
 | **编译产物** | `diting` |
-| **配置** | `config.json` 中 `feishu` 需包含：`enabled`、`app_id`、`app_secret`、**`approval_user_id`**（审批人 user_id）、`approval_timeout_minutes`、**`use_message_reply`: true**、**`poll_interval_seconds`**（如 2） |
+| **配置** | `config.yaml` + `.env`：飞书相关由 `.env` 的 `DITING_FEISHU_*` 覆盖，详见 CONFIG_LAYERS.md |
 | **回复** | 审批消息发到审批人单聊；审批人在飞书回复「approve & 请求ID」或「deny & 请求ID」 |
 
 其他入口：
@@ -40,11 +40,11 @@ go build -o diting main.go
 go build -o diting main_complete.go
 ```
 
-## 第二步 B：配置 config.json（飞书必填）
+## 第二步 B：配置 config.yaml + .env（飞书必填）
 
-首次使用：将 `config.example.json` 复制为 `config.json`，填入 `app_id`、`app_secret` 等（勿提交含密钥的 config.json）。
+首次使用：`cp config.example.yaml config.yaml`，`cp .env.example .env`，在 `.env` 中填入 `DITING_FEISHU_APP_ID`、`DITING_FEISHU_APP_SECRET`、`DITING_FEISHU_APPROVAL_USER_ID` 等（勿提交 .env）。
 
-确保 `config.json` 中飞书段包含：
+确保 `.env` 中飞书相关包含：
 
 ```json
 "feishu": {
@@ -109,7 +109,7 @@ curl -x http://127.0.0.1:8081 -X DELETE https://httpbin.org/delete
 ### 1. 使用默认 diting（推荐）
 
 - 在飞书开放平台获取 **app_id**、**app_secret**。
-- 获取审批人 **user_id**（管理后台或接口），填入 `config.json` 的 `approval_user_id`。
+- 获取审批人 **user_id**（管理后台或接口），填入 `.env` 的 `DITING_FEISHU_APPROVAL_USER_ID`。
 - 无需开启「长连接」或配置公网回调。
 
 ### 2. 使用 main_complete（群聊 + 长连接）
@@ -173,7 +173,7 @@ response = requests.get('https://api.example.com', proxies=proxies)
 
 ## 自定义
 
-编辑 `config.json` 可修改：代理端口、风险规则、审批超时、审计日志路径。修改后重启生效。
+编辑 `config.yaml` 与 `.env` 可修改：代理端口、风险规则、审批超时、审计日志路径。修改后重启生效。
 
 ## 验证清单
 

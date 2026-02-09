@@ -251,4 +251,4 @@ curl -X POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/intern
 
 **状态**: 🚧 代码生成中  
 **预计完成**: 10-15 分钟  
-**配置文件**: `/home/dministrator/workspace/sentinel-ai/cmd/diting/config.json`
+**配置文件**: `config.yaml` + `.env`（见 CONFIG_LAYERS.md）

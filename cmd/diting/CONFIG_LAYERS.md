@@ -23,7 +23,7 @@
 2. 确定 YAML 路径：`-config` > `CONFIG_PATH` > config.yaml（若存在）> config.example.yaml  
 3. `config.Load(yamlPath)` → 读 YAML，再 `applyEnvOverrides` 用环境变量覆盖  
 
-**已移除**：不再读取 config.json；不再使用 config.local.yaml / config.acceptance.yaml 的默认链。
+**已移除**：config.json 已从仓库删除。备用 main 与 All-in-One 均从 config.yaml + .env 加载。不再使用 config.local.yaml / config.acceptance.yaml 的默认链。
 
 ---
 

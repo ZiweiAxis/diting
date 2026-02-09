@@ -61,12 +61,9 @@ logs/
 logs/*.log
 cmd/diting/out_*.log
 
-# Built binaries (build with go build -o <name>)
+# Diting 构建产物：统一放到 cmd/diting/bin/（已由上方 bin/ 忽略），勿在 cmd/diting 根目录生成
 cmd/diting/diting
-cmd/diting/diting-ollama
-cmd/diting/diting_ws
-cmd/diting/diting_ws_fixed
-cmd/diting/diting_feishu
+cmd/diting/diting-*
 cmd/diting/diting_*
 
 # Cursor / BMAD (IDE and workflow)
@@ -80,3 +77,9 @@ cmd/diting/data/
 
 # Air watch 临时目录
 cmd/diting/tmp/
+
+# 过程性/开发过程文档（通用目录，不提交）
+_process_docs/
+
+# 临时性工具/脚本（与过程文档一样不提交，统一放此目录）
+_temp/

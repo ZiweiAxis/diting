@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// configJSON 与 cmd/diting/config.json 结构兼容，用于导入飞书/代理等配置到 env。
+// configJSON 与旧版 JSON 配置结构兼容，用于 LoadEnvFromConfigJSON（可选，主流程已用 config.yaml + .env）。
 type configJSON struct {
 	Proxy  *struct{ Listen string `json:"listen"` } `json:"proxy"`
 	Feishu *struct {
@@ -60,9 +60,8 @@ func LoadEnvFile(path string, override bool) error {
 	return sc.Err()
 }
 
-// LoadEnvFromConfigJSON 从 path 读取 config.json（与 main.go/main_feishu.go 同格式），
-// 将其中的 feishu、proxy 等写入环境变量（仅当该 env 尚未设置时），供后续 applyEnvOverrides 使用。
-// 这样 All-in-One 可直接复用已有的 config.json，无需再配 .env。
+// LoadEnvFromConfigJSON 从 path 读取旧版 JSON 配置文件，
+// 将其中的 feishu、proxy 等写入环境变量（仅当该 env 尚未设置时）。主流程已用 config.yaml + .env，此函数为可选兼容。
 func LoadEnvFromConfigJSON(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -86,7 +85,7 @@ func LoadEnvFromConfigJSON(path string) error {
 		setEnvIfEmpty("DITING_FEISHU_APPROVAL_USER_ID", c.Feishu.ApprovalUserID)
 		setEnvIfEmpty("DITING_FEISHU_CHAT_ID", c.Feishu.ChatID)
 	}
-	// 不从 config.json 注入 proxy.listen，避免覆盖 YAML 的 listen_addr（如 :8080），
+	// 不注入 proxy.listen，避免覆盖 YAML 的 listen_addr（如 :8080），
 	// 否则网关会占 8081 与上游端口冲突；若需用 8081 可在 .env 设 DITING_PROXY_LISTEN。
 	return nil
 }
@@ -139,6 +138,30 @@ func applyEnvOverrides(c *Config) {
 	if v := os.Getenv("DITING_CHEQ_TIMEOUT_SECONDS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			c.CHEQ.TimeoutSeconds = n
+		}
+	}
+	if c.LLM != nil {
+		if v := os.Getenv("DITING_LLM_BASE_URL"); v != "" {
+			c.LLM.BaseURL = v
+		}
+		if v := os.Getenv("DITING_LLM_API_KEY"); v != "" {
+			c.LLM.APIKey = v
+		}
+		if v := os.Getenv("DITING_LLM_MODEL"); v != "" {
+			c.LLM.Model = v
+		}
+		if v := os.Getenv("DITING_LLM_PROVIDER"); v != "" {
+			c.LLM.Provider = v
+		}
+		if v := os.Getenv("DITING_LLM_MAX_TOKENS"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				c.LLM.MaxTokens = n
+			}
+		}
+		if v := os.Getenv("DITING_LLM_TEMPERATURE"); v != "" {
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				c.LLM.Temperature = f
+			}
 		}
 	}
 }
