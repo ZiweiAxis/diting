@@ -93,10 +93,20 @@ func (p *Provider) Deliver(ctx context.Context, in *delivery.DeliverInput) error
 		return err
 	}
 
-	if p.cfg.UseCardDelivery {
-		err = p.sendCard(ctx, token, receiveIDType, receiveID, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
-	} else {
-		err = p.sendMessage(ctx, token, receiveIDType, receiveID, body)
+	for attempt := 0; attempt < 3; attempt++ {
+		if p.cfg.UseCardDelivery {
+			err = p.sendCard(ctx, token, receiveIDType, receiveID, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
+		} else {
+			err = p.sendMessage(ctx, token, receiveIDType, receiveID, body)
+		}
+		if err == nil {
+			break
+		}
+		if attempt < 2 {
+			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			fmt.Fprintf(os.Stderr, "[diting] 飞书投递重试 %d/3  after %v: %v\n", attempt+1, backoff, err)
+			time.Sleep(backoff)
+		}
 	}
 	if err != nil && strings.Contains(err.Error(), "open_id cross app") && p.cfg.ChatID != "" {
 		fmt.Fprintf(os.Stderr, "[diting] 飞书投递: open_id cross app，回退到 chat_id\n")

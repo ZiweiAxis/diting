@@ -8,8 +8,12 @@
 
 | 文档 | 用途 |
 |------|------|
+| **ACCEPTANCE_CHECKLIST.md** | 闭环验收检查单（策略→卡片→长连接点击→放行/拒绝） |
+| **run_acceptance.sh** | 验收脚本：`start` 启动服务 / `trigger` 触发审批 / `stop` 停止 |
 | **VERIFY_CARD.md** | 交互卡片验证步骤（发卡片、点按钮、200340 排查） |
 | **FEISHU_LONG_CONNECTION_CARD.md** | 长连接 + 卡片：只走 WebSocket（card.action.trigger），不填 request_url |
+| **QUICKSTART_DOCKER.md** | 容器 15 分钟快速开始（Dockerfile.diting + 运行与验证） |
+| **DNS_MODE.md** | 双接入：Proxy 与 DNS 模式说明与验证 |
 | **config.acceptance.yaml** | 验收配置（策略、CHEQ、飞书、use_card_delivery / use_long_connection） |
 | **README.md** | 项目入口与构建说明 |
 

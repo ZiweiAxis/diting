@@ -10,6 +10,7 @@ import (
 
 	"diting/internal/audit"
 	"diting/internal/cheq"
+	"diting/internal/delivery"
 	"diting/internal/models"
 	"diting/internal/policy"
 )
@@ -34,6 +35,7 @@ type pipeline struct {
 	policy                 policy.Engine
 	cheq                   cheq.Engine
 	audit                  audit.Store
+	delivery               delivery.Provider
 	cheqTimeoutSec         int
 	reviewRequiresApproval bool
 }
@@ -96,6 +98,7 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 		_, _ = fmt.Fprintf(os.Stderr, "[diting] CHEQ 待确认 id=%s 批准: http://localhost:8080/cheq/approve?id=%s&approved=true 拒绝: http://localhost:8080/cheq/approve?id=%s&approved=false\n", obj.ID, obj.ID, obj.ID)
 		deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
 		var finalStatus string
+		var reminded bool
 		for time.Now().Before(deadline) {
 			o, _ := p.cheq.GetByID(ctx, obj.ID)
 			if o == nil {
@@ -105,6 +108,10 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 			if o.IsTerminal() {
 				finalStatus = string(o.Status)
 				break
+			}
+			if !reminded && p.delivery != nil && time.Until(o.ExpiresAt) <= 60*time.Second {
+				reminded = true
+				_ = p.delivery.Deliver(ctx, &delivery.DeliverInput{Object: o, Options: &delivery.DeliverOptions{Summary: "【提醒】该请求即将超时，请尽快处理"}})
 			}
 			time.Sleep(2 * time.Second)
 		}

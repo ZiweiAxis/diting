@@ -42,7 +42,7 @@ func NewServer(
 		delivery:  delivery,
 		audit:     audit,
 		ownership: ownership,
-		pipeline:  &pipeline{policy: policy, cheq: cheq, audit: audit, cheqTimeoutSec: cfg.CHEQ.TimeoutSeconds, reviewRequiresApproval: reviewRequiresApproval},
+		pipeline:  &pipeline{policy: policy, cheq: cheq, audit: audit, delivery: delivery, cheqTimeoutSec: cfg.CHEQ.TimeoutSeconds, reviewRequiresApproval: reviewRequiresApproval},
 	}
 }
 

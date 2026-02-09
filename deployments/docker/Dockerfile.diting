@@ -1,0 +1,23 @@
+# Diting All-in-One 镜像
+# 构建上下文请使用仓库根目录，例如： docker build -f deployments/docker/Dockerfile.diting -t diting:latest .
+
+FROM golang:1.21-alpine AS builder
+WORKDIR /build
+COPY cmd/diting/go.mod cmd/diting/go.sum ./
+RUN go mod download
+COPY cmd/diting/ ./
+RUN CGO_ENABLED=0 go build -o diting ./cmd/diting_allinone
+
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY --from=builder /build/diting /app/diting
+COPY cmd/diting/config.example.yaml /app/config.example.yaml
+COPY cmd/diting/policy_rules.example.yaml /app/policy_rules.example.yaml
+RUN mkdir -p /app/data
+EXPOSE 8080
+ENV CONFIG_PATH=/app/config.example.yaml
+# 挂载或 -e CONFIG_PATH=/app/config.yaml 使用自己的配置
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:8080/healthz || exit 1
+CMD ["/app/diting"]
