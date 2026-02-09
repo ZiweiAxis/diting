@@ -1,0 +1,19 @@
+# 策略规则示例：按顺序匹配，第一条命中即生效；无命中则默认拒绝。
+# 将此类文件路径填入 config 的 policy.rules_path。
+
+rules:
+  - id: review_dangerous
+    action: "*"
+    resource: "/admin"
+    decision: review
+    reason: 管理路径需人工确认
+  - id: allow_read
+    action: GET
+    resource: "*"
+    decision: allow
+    reason: 只读操作放行
+  - id: deny_delete
+    action: DELETE
+    resource: "*"
+    decision: deny
+    reason: 禁止删除操作
