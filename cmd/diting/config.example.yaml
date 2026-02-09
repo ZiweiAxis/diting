@@ -1,0 +1,38 @@
+# Diting All-in-One 示例配置
+# 敏感项请使用环境变量覆盖，例如：DITING_FEISHU_APP_SECRET、DITING_FEISHU_APP_ID
+
+proxy:
+  listen_addr: ":8080"
+  upstream: "http://localhost:8081"
+
+policy:
+  # 规则文件路径，见 policy_rules.example.yaml；空则使用占位引擎（恒放行）
+  rules_path: ""
+
+cheq:
+  timeout_seconds: 300
+  persistence_path: "./data/cheq"
+
+delivery:
+  feishu:
+    app_id: ""
+    # app_secret 务必通过环境变量 DITING_FEISHU_APP_SECRET 设置，不要写入此文件
+    enabled: true
+    approval_user_id: ""   # 审批人 ID；遇 open_id cross app(99992361) 时改为填 user_id 并设 receive_id_type: user_id
+    receive_id_type: ""   # open_id（默认）或 user_id；填 user_id 可避免跨应用 open_id 报错
+    approval_timeout_minutes: 5
+    use_message_reply: true
+    poll_interval_seconds: 2
+    chat_id: ""            # 群聊 ID 兜底，或设 DITING_FEISHU_CHAT_ID
+    gateway_base_url: ""   # 审批链接前缀，如 http://localhost:8080；或 DITING_GATEWAY_BASE_URL
+    use_card_delivery: false   # true：发交互卡片（批准/拒绝按钮）；验证长连接时建议 true
+    use_long_connection: false # true：启动飞书 WebSocket 长连接，接收卡片点击等事件；需在飞书后台选「长连接」订阅
+
+audit:
+  path: "./data/audit.jsonl"
+  redact: []
+
+ownership:
+  # resource 或 "*" -> 确认人 ID 列表（如飞书 open_id）；供 CHEQ 投递目标
+  static_map: {}
+  # 示例：static_map: { "/admin": ["xxxx"], "*": ["xxxx"] }
