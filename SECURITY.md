@@ -26,3 +26,10 @@ We will acknowledge reports and work on a fix; we may ask for more detail. We do
 
 - Do **not** commit `config.json` or any file containing `app_secret`, `api_key`, or other credentials. Use `config.example.json` as a template and keep real config local or in environment variables.
 - Rotate any credentials that may have been exposed in repository history.
+
+## Documentation Desensitization
+
+- In **all documentation** (README, FEISHU_*, DELIVERY, planning artifacts, etc.), Feishu and other third-party config must be **desensitized**:
+  - **Secrets** (e.g. `app_secret`, `api_key`): use `***`.
+  - **Other identifiers** (e.g. `app_id`, `approval_user_id`, `chat_id`, `receive_id`): use `xxxx`.
+- Never paste real app IDs, user IDs, or chat IDs into docs or examples.

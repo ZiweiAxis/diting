@@ -79,7 +79,7 @@ API 端点 `/open-apis/im/v1/stream/get` 返回 404，说明：
 
 **步骤：**
 1. 访问 https://open.feishu.cn/app
-2. 选择应用 `cli_a90d5a960cf89cd4`
+2. 选择应用 `xxxx`
 3. 进入「事件订阅」
 4. 选择「长连接」模式
 5. 启用并保存

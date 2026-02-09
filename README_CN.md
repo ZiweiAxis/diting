@@ -8,7 +8,9 @@
 
 **谛听** - 中国神话中的神兽，能辨别真假善恶，倾听世间万物之声。本平台作为 AI Agent 的守护者，确保其操作安全可信。
 
-[English](README.md) | [快速开始](#-快速开始)
+**状态：** MVP / 概念验证 — 适合试用与反馈；尚未达到生产就绪。
+
+[English](README.md) | [快速开始](#-快速开始) | [安全](SECURITY.md)
 
 ---
 
@@ -106,6 +108,23 @@ go build -o diting main.go
 # 运行
 ./diting
 ```
+
+#### 方式 2b：飞书审批（推荐用于人机协同）
+
+高风险操作需飞书审批时（无需公网回调或飞书「长连接」）：
+
+```bash
+cd diting/cmd/diting
+
+# 构建飞书消息回复审批版
+go build -o diting main.go
+
+# 配置 config.json（feishu.approval_user_id、use_message_reply: true、poll_interval_seconds）
+# 然后运行
+./diting
+```
+
+配置与最小验证步骤见 **[cmd/diting/QUICKSTART_CN.md](cmd/diting/QUICKSTART_CN.md)**（[English](cmd/diting/QUICKSTART.md)）。
 
 #### 方式 3：Docker 部署
 
@@ -214,7 +233,8 @@ requests.delete('https://random-api.com/data')   // ✅ 支持
 
 ## 📚 文档
 
-- [快速开始指南](docs/QUICKSTART.md) - 5 分钟上手
+- [快速开始指南（中文）](cmd/diting/QUICKSTART_CN.md) / [Quick Start (EN)](cmd/diting/QUICKSTART.md) - 5 分钟上手
+- [飞书排错（中文）](cmd/diting/FEISHU_TROUBLESHOOTING_CN.md) - 收不到审批消息时排查
 - [安装指南](docs/INSTALL.md) - 详细部署说明
 - [架构指南](docs/ARCHITECTURE_DNS_HIJACK.md) - 系统架构
 - [测试指南](docs/TEST.md) - 测试场景和用例

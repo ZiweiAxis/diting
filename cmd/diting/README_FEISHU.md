@@ -46,7 +46,7 @@ cd /home/dministrator/workspace/sentinel-ai/cmd/diting
 ✓ 配置加载成功
   LLM: claude-haiku-3-5
   飞书: 消息回复模式
-  审批人: ou_c06d8e07a92b69d09889a055cb6725bc
+  审批人: xxxx
 
 ✓ 代理服务器启动成功
   监听地址: http://localhost:8081
@@ -156,9 +156,9 @@ curl -x http://localhost:8081 -X DELETE http://httpbin.org/delete
   },
   "feishu": {
     "enabled": true,
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo",
-    "approval_user_id": "ou_c06d8e07a92b69d09889a055cb6725bc",
+    "app_id": "xxxx",
+    "app_secret": "***",
+    "approval_user_id": "xxxx",
     "approval_timeout_minutes": 5,    // 审批超时
     "use_interactive_card": false,    // 不使用交互卡片
     "use_message_reply": true,        // 使用消息回复
@@ -240,7 +240,7 @@ tail -1 logs/audit.jsonl | python3 -m json.tool
 
 检查方法：
 1. 访问 https://open.feishu.cn/app
-2. 找到应用 `cli_a90d5a960cf89cd4`
+2. 找到应用 `xxxx`
 3. 进入「权限管理」
 4. 确认权限已添加并发布
 
@@ -275,8 +275,8 @@ tail -1 logs/audit.jsonl | python3 -m json.tool
 curl -X POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal \
   -H "Content-Type: application/json" \
   -d '{
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo"
+    "app_id": "xxxx",
+    "app_secret": "***"
   }'
 ```
 

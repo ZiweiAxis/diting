@@ -203,8 +203,8 @@ tail -f logs/audit.jsonl | jq
 ╚════════════════════════════════════════════════════════╝
 
 ✓ 配置加载成功
-  App ID: cli_a90d5a960cf89cd4
-  Chat ID: oc_2ffdc43f1b0b8fbde82e1548f2ae6ed4
+  App ID: xxxx
+  Chat ID: xxxx
   代理端口: :8081
 
 ✓ 审计日志记录器初始化成功
@@ -240,7 +240,7 @@ tail -f logs/audit.jsonl | jq
 ```
 [11:24:30] 📨 收到飞书消息
   消息 ID: om_xxx
-  Chat ID: oc_2ffdc43f1b0b8fbde82e1548f2ae6ed4
+  Chat ID: xxxx
   内容: 批准
   ✅ 审批通过 (ID: 12345678)
   ✓ 审批通过，执行请求

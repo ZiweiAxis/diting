@@ -346,7 +346,7 @@ func handleFeishuMessage(message FeishuMessage) {
   },
   "feishu": {
     "enabled": true,
-    "approval_user_id": "ou_c06d8e07a92b69d09889a055cb6725bc",
+    "approval_user_id": "xxxx",
     "approval_timeout_minutes": 5,
     "use_interactive_card": true,
     "fallback_to_message": true

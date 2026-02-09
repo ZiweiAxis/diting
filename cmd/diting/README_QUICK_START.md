@@ -93,7 +93,7 @@ log.Printf("  [DEBUG] 发送心跳: %d", time.Now().Unix())
 #### 1. 在飞书开放平台启用长连接
 ```
 访问: https://open.feishu.cn/app
-应用: cli_a90d5a960cf89cd4
+应用: xxxx
 路径: 事件订阅 -> 长连接 -> 启用
 事件: im.message.receive_v1
 ```

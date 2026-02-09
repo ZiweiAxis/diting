@@ -5,9 +5,9 @@
 ```json
 {
   "feishu": {
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo",
-    "approval_user_id": "ou_c06d8e07a92b69d09889a055cb6725bc",
+    "app_id": "xxxx",
+    "app_secret": "***",
+    "approval_user_id": "xxxx",
     "approval_timeout_minutes": 5,
     "use_message_reply": true,
     "poll_interval_seconds": 2
@@ -97,7 +97,7 @@ go build -o diting main.go
 ✓ 配置加载成功
   LLM: Claude Haiku 3.5
   飞书: 消息回复模式
-  审批人: ou_c06d8e07a92b69d09889a055cb6725bc
+  审批人: xxxx
 
 ✓ 代理服务器启动成功
   监听地址: http://localhost:8081
@@ -129,8 +129,8 @@ curl -x http://localhost:8081 -X DELETE http://httpbin.org/delete
    ```
    POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal
    Body: {
-     "app_id": "cli_a90d5a960cf89cd4",
-     "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo"
+     "app_id": "xxxx",
+     "app_secret": "***"
    }
    ```
 
@@ -141,7 +141,7 @@ curl -x http://localhost:8081 -X DELETE http://httpbin.org/delete
      "Authorization": "Bearer {tenant_access_token}"
    }
    Body: {
-     "receive_id": "ou_c06d8e07a92b69d09889a055cb6725bc",
+     "receive_id": "xxxx",
      "msg_type": "text",
      "content": "{\"text\":\"审批消息内容\"}"
    }
@@ -213,8 +213,8 @@ Body: {
 curl -X POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal \
   -H "Content-Type: application/json" \
   -d '{
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo"
+    "app_id": "xxxx",
+    "app_secret": "***"
   }'
 ```
 

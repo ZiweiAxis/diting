@@ -47,9 +47,9 @@
   },
   "feishu": {
     "enabled": true,
-    "app_id": "cli_a90d5a960cf89cd4",
-    "app_secret": "8M3oj4XsRD7JLX0aIgNYedzqdQgaQeUo",
-    "chat_id": "oc_2ffdc43f1b0b8fbde82e1548f2ae6ed4",
+    "app_id": "xxxx",
+    "app_secret": "***",
+    "chat_id": "xxxx",
     "approval_timeout_minutes": 5
   },
   "risk": {
