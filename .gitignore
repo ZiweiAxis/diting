@@ -70,5 +70,10 @@ cmd/diting/diting_*
 
 # Cursor / BMAD (IDE and workflow)
 .cursor/
+.claude/
 _bmad/
 _bmad-output/
+
+# Local acceptance config/data (sensitive/runtime)
+cmd/diting/config.acceptance.yaml
+cmd/diting/data/
