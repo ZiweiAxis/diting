@@ -1,0 +1,31 @@
+# Air 配置：改代码自动重新编译并重启 Diting All-in-One
+# 使用：在 cmd/diting 下执行 air，或仓库根目录 make watch
+# 安装 air: go install github.com/air-verse/air@latest
+
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./bin/diting ./cmd/diting_allinone"
+  # 不传 -config：程序默认 config.yaml（若有）否则 config.example.yaml，敏感项由 .env 覆盖
+  entrypoint = ["./bin/diting"]
+  include_ext = ["go", "yaml", "yml", "json"]
+  exclude_dir = ["bin", "data", "tmp", "vendor", ".git"]
+  exclude_file = []
+  exclude_regex = ["_test\\.go$"]
+  exclude_unchanged = false
+  delay = 1000
+  stop_on_error = true
+  send_interrupt = true
+
+[log]
+  time = false
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true

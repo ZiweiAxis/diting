@@ -42,7 +42,7 @@ cd cmd/diting
 # python3 -c "import http.server,socketserver; socketserver.TCPServer(('',8081), http.server.BaseHTTPRequestHandler).serve_forever()" &
 
 # 3）启动网关（会看到 “[diting] 飞书投递已启用，审批人将收到待确认消息”）
-./bin/diting -config config.acceptance.yaml
+./bin/diting
 ```
 
 若未配置飞书，启动时会打印：

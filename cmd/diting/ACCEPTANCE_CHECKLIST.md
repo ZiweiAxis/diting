@@ -27,9 +27,9 @@ cd /home/dministrator/workspace/sentinel-ai/cmd/diting
 ```bash
 # 若 8080 被占用，先结束占用进程
 pkill -f diting_allinone   # 或 kill <PID>
-# 启动（会加载 .env 与 config.acceptance.yaml）
-go run ./cmd/diting_allinone/ -config config.acceptance.yaml
-# 或： ./bin/diting -config config.acceptance.yaml
+# 启动（会加载 .env，主配置为 config.yaml 或 config.example.yaml）
+go run ./cmd/diting_allinone/
+# 或： ./bin/diting
 ```
 
 **验收点**：终端出现  
@@ -44,7 +44,7 @@ go run ./cmd/diting_allinone/ -config config.acceptance.yaml
 curl -s -X POST "http://localhost:8080/admin" -H "Host: example.com" -d '{}'
 ```
 
-此时请求会挂起，等待审批（最多约 120 秒，见 `config.acceptance.yaml` 中 `cheq.timeout_seconds`）。
+此时请求会挂起，等待审批（最多约 120 秒，见 config.example.yaml 中 cheq.timeout_seconds）。
 
 ### 3. 在飞书中操作
 

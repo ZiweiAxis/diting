@@ -14,8 +14,10 @@
 | **FEISHU_LONG_CONNECTION_CARD.md** | 长连接 + 卡片：只走 WebSocket（card.action.trigger），不填 request_url |
 | **QUICKSTART_DOCKER.md** | 容器 15 分钟快速开始（Dockerfile.diting + 运行与验证） |
 | **DNS_MODE.md** | 双接入：Proxy 与 DNS 模式说明与验证 |
-| **config.acceptance.yaml** | 验收配置（策略、CHEQ、飞书、use_card_delivery / use_long_connection） |
+| **config.example.yaml** | 配置模板（复制为 config.yaml 使用）；敏感项用 .env |
 | **README.md** | 项目入口与构建说明 |
+| **.air.toml** | Watch 模式配置（改代码自动重新编译并重启）；使用：仓库根 `make watch` 或本目录 `air`，需先安装 air |
+| **CONFIG_LAYERS.md** | config.yaml / config.json / .env 关系、加载顺序与收敛说明 |
 
 ---
 

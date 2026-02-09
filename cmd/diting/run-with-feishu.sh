@@ -14,4 +14,4 @@ fi
 if [ -z "$DITING_FEISHU_APPROVAL_USER_ID" ] && [ -z "$DITING_FEISHU_CHAT_ID" ]; then
   [ -n "$DITING_FEISHU_APP_ID" ] && echo "[diting] 未设置 DITING_FEISHU_APPROVAL_USER_ID，请设置否则飞书无法发送接收人"
 fi
-exec ./bin/diting -config config.acceptance.yaml
+exec ./bin/diting

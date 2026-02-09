@@ -9,11 +9,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fatih/color"
+
+	envloader "diting/internal/config"
 )
 
 // 配置结构
@@ -99,10 +102,12 @@ var (
 )
 
 func main() {
-	// 加载配置
+	// 先加载 .env，再用环境变量覆盖 config
+	_ = envloader.LoadEnvFile(".env", true)
 	if err := loadConfig("config.json"); err != nil {
 		log.Fatalf("加载配置失败: %v", err)
 	}
+	applyEnvOverrides()
 
 	// 打印启动信息
 	printBanner()
@@ -159,6 +164,41 @@ func loadConfig(filename string) error {
 		return err
 	}
 	return json.Unmarshal(data, &config)
+}
+
+// applyEnvOverrides 用 .env 中的 DITING_LLM_*、DITING_FEISHU_* 覆盖已加载的 config。
+func applyEnvOverrides() {
+	if v := os.Getenv("DITING_LLM_BASE_URL"); v != "" {
+		config.LLM.BaseURL = v
+	}
+	if v := os.Getenv("DITING_LLM_API_KEY"); v != "" {
+		config.LLM.APIKey = v
+	}
+	if v := os.Getenv("DITING_LLM_MODEL"); v != "" {
+		config.LLM.Model = v
+	}
+	if v := os.Getenv("DITING_LLM_PROVIDER"); v != "" {
+		config.LLM.Provider = v
+	}
+	if v := os.Getenv("DITING_LLM_MAX_TOKENS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			config.LLM.MaxTokens = n
+		}
+	}
+	if v := os.Getenv("DITING_LLM_TEMPERATURE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			config.LLM.Temperature = f
+		}
+	}
+	if v := os.Getenv("DITING_FEISHU_APP_ID"); v != "" {
+		config.Feishu.AppID = v
+	}
+	if v := os.Getenv("DITING_FEISHU_APP_SECRET"); v != "" {
+		config.Feishu.AppSecret = v
+	}
+	if v := os.Getenv("DITING_FEISHU_APPROVAL_USER_ID"); v != "" {
+		config.Feishu.ApprovalUserID = v
+	}
 }
 
 // HTTP 代理处理

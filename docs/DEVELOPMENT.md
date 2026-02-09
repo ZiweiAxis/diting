@@ -33,8 +33,9 @@ sentinel-ai/
 | WebSocket approval    | `main_ws_fixed.go`| `diting_ws_fixed` | Requires Feishu "long connection" |
 | No Feishu             | `main.go`         | `diting`        | Ollama intent analysis, local approval |
 
-- Build: `go build -o diting main.go` (from `cmd/diting`). This directory has multiple main packages; build by specifying the file, e.g. `go build -o diting-ollama main_ollama.go`.
+- Build: `go build -o diting main.go` (from `cmd/diting`). **All-in-One 推荐**：`go build -o bin/diting ./cmd/diting_allinone`；或仓库根目录 `make build`。
 - Config: see `cmd/diting/QUICKSTART.md` and `config.json` comments; keep secrets in env or local overrides; do not commit keys.
+- **Watch 模式（本地开发）**：修改代码或配置后自动重新编译并重启，无需每次手敲命令。安装 [air](https://github.com/air-verse/air)：`go install github.com/air-verse/air@latest`；在仓库根目录执行 `make watch`，或在 `cmd/diting` 下执行 `air`。配置见 `cmd/diting/.air.toml`。
 
 ---
 

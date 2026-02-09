@@ -4,7 +4,7 @@ set -e
 cd "$(dirname "$0")"
 LOG_FILE="${LOG_FILE:-/tmp/diting_acceptance.log}"
 BINARY="${BINARY:-./bin/diting}"
-CONFIG="${CONFIG:-config.acceptance.yaml}"
+CONFIG="${CONFIG:-}"
 LISTEN="${LISTEN:-:8080}"
 
 # 查找占用 $port 的 PID（兼容 8080 或 :8080）
@@ -26,8 +26,13 @@ start_server() {
     echo "[验收] 未找到 $BINARY，正在编译..."
     go build -o bin/diting ./cmd/diting_allinone
   fi
-  echo "[验收] 启动服务：$BINARY -config $CONFIG（日志: $LOG_FILE）"
-  nohup "$BINARY" -config "$CONFIG" >> "$LOG_FILE" 2>&1 &
+  if [[ -n "$CONFIG" ]]; then
+    echo "[验收] 启动服务：$BINARY -config $CONFIG（日志: $LOG_FILE）"
+    nohup "$BINARY" -config "$CONFIG" >> "$LOG_FILE" 2>&1 &
+  else
+    echo "[验收] 启动服务：$BINARY（使用默认 config.yaml / config.example.yaml，日志: $LOG_FILE）"
+    nohup "$BINARY" >> "$LOG_FILE" 2>&1 &
+  fi
   echo $! > /tmp/diting_acceptance.pid
   sleep 5
   if ! grep -q "飞书投递已启用" "$LOG_FILE" 2>/dev/null; then

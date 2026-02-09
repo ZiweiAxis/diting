@@ -50,8 +50,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Local config (use config.example.json as template)
+# Local config：复制 config.example.yaml 为 config.yaml，敏感项用 .env
 cmd/diting/config.json
+cmd/diting/config.yaml
 cmd/diting/config.local.json
 
 # Logs
@@ -74,6 +75,8 @@ cmd/diting/diting_*
 _bmad/
 _bmad-output/
 
-# Local acceptance config/data (sensitive/runtime)
-cmd/diting/config.acceptance.yaml
+# Local data (sensitive/runtime)
 cmd/diting/data/
+
+# Air watch 临时目录
+cmd/diting/tmp/

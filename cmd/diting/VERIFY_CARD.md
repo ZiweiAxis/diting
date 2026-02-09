@@ -5,9 +5,8 @@
 ## 1. 配置
 
 - 已启用交互卡片：
-  - 在 `config.acceptance.yaml` 中已设置 `delivery.feishu.use_card_delivery: true`；
-  - 或设置环境变量：`export DITING_FEISHU_USE_CARD_DELIVERY=true`。
-- 飞书：`app_id`、`app_secret`、`approval_user_id` 或 `chat_id` 已配置（可用 `config.json` + `.env`，或 YAML + 环境变量）。
+  - 在 config.yaml / config.example.yaml 中已设置 `delivery.feishu.use_card_delivery: true`，或环境变量 `DITING_FEISHU_USE_CARD_DELIVERY=true`。
+- 飞书：`app_id`、`app_secret`、`approval_user_id` 或 `chat_id` 由 **.env** 的 DITING_* 提供。
 - 策略会触发 review：例如 `policy_rules.example.yaml` 中 `resource: "/admin"` 的规则会走 `decision: review`。
 
 ## 2. 启动服务
@@ -15,14 +14,14 @@
 ```bash
 cd /home/dministrator/workspace/sentinel-ai/cmd/diting
 # 若用 config.json 注入飞书配置，会先读 config.json 再读 YAML
-go run ./cmd/diting_allinone/ -config config.acceptance.yaml
+go run ./cmd/diting_allinone/
 ```
 
 或先编译再运行：
 
 ```bash
 go build -o diting_allinone ./cmd/diting_allinone/
-./diting_allinone -config config.acceptance.yaml
+./bin/diting
 ```
 
 确认日志中有「飞书投递已启用」且无报错。
@@ -67,5 +66,5 @@ curl -s -X POST "http://localhost:8080/admin" -H "Host: example.com" -d '{}'
 
 **处理**：
 
-1. **程序侧**：`use_long_connection: true` 时，卡片已显式设 `request_url: ""`，表示不走 HTTP 回调，只走长连接。请确认运行用的是带该逻辑的版本及 `config.acceptance.yaml`（或环境变量 `DITING_FEISHU_USE_LONG_CONNECTION=true`）。
+1. **程序侧**：`use_long_connection: true` 时，卡片已显式设 `request_url: ""`，表示不走 HTTP 回调，只走长连接。请确认运行用的是带该逻辑的版本，且 config 中 use_long_connection: true 或环境变量 DITING_FEISHU_USE_LONG_CONNECTION=true。
 2. **飞书后台**：若仍 200340，请到 **飞书开放平台 → 该应用 → 事件与回调**（或「回调订阅」）中，查看是否配置了「将回调发送至开发者服务器」的请求地址。若已配置且为本地/不可达地址，请**清空或删除该请求地址**，只保留「使用长连接接收事件」，这样卡片点击只会通过 WebSocket 推送，不再尝试 HTTP 回调。

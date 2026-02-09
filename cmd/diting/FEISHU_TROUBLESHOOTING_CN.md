@@ -54,7 +54,7 @@ go build -o diting main.go && ./diting
 
 **处理**：改为使用**本应用下该用户的 user_id**（不要用 open_id），并显式指定 `receive_id_type=user_id`：
 
-- **All-in-One（config.acceptance.yaml / config.example.yaml）**：在 `delivery.feishu` 下设置  
+- **All-in-One（config.yaml / config.example.yaml）**：在 `delivery.feishu` 下设置  
   `receive_id_type: user_id`，并把 `approval_user_id` 改为该用户的 **user_id**（或环境变量 `DITING_FEISHU_RECEIVE_ID_TYPE=user_id`、`DITING_FEISHU_APPROVAL_USER_ID=<user_id>`）。
 - **获取 user_id**：  
   - 若用户已给本应用发过消息：`go run get_feishu_user_id.go`，按提示收事件后终端会打印 **user_id**；  

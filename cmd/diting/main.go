@@ -10,11 +10,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+
+	configpkg "diting/internal/config"
 )
 
 // ============================================================================
@@ -182,10 +185,12 @@ var (
 // ============================================================================
 
 func main() {
-	// Load configuration
+	// 先加载 .env，再用环境变量覆盖 config
+	_ = configpkg.LoadEnvFile(".env", true)
 	if err := loadConfig("/home/dministrator/workspace/sentinel-ai/cmd/diting/config.json"); err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	applyEnvOverrides()
 
 	// Initialize audit logging
 	if config.Audit.Enabled {
@@ -228,6 +233,44 @@ func loadConfig(path string) error {
 
 	log.Printf("Configuration loaded successfully")
 	return nil
+}
+
+// applyEnvOverrides 用 .env 中的 DITING_LLM_*、DITING_FEISHU_* 覆盖已加载的 config。
+func applyEnvOverrides() {
+	if v := os.Getenv("DITING_LLM_BASE_URL"); v != "" {
+		config.LLM.BaseURL = v
+	}
+	if v := os.Getenv("DITING_LLM_API_KEY"); v != "" {
+		config.LLM.APIKey = v
+	}
+	if v := os.Getenv("DITING_LLM_MODEL"); v != "" {
+		config.LLM.Model = v
+	}
+	if v := os.Getenv("DITING_LLM_PROVIDER"); v != "" {
+		config.LLM.Provider = v
+	}
+	if v := os.Getenv("DITING_LLM_MAX_TOKENS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			config.LLM.MaxTokens = n
+		}
+	}
+	if v := os.Getenv("DITING_LLM_TEMPERATURE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			config.LLM.Temperature = f
+		}
+	}
+	if v := os.Getenv("DITING_FEISHU_APP_ID"); v != "" {
+		config.Feishu.AppID = v
+	}
+	if v := os.Getenv("DITING_FEISHU_APP_SECRET"); v != "" {
+		config.Feishu.AppSecret = v
+	}
+	if v := os.Getenv("DITING_FEISHU_APPROVAL_USER_ID"); v != "" {
+		config.Feishu.ApprovalUserID = v
+	}
+	if v := os.Getenv("DITING_FEISHU_CHAT_ID"); v != "" {
+		config.Feishu.ChatID = v
+	}
 }
 
 // ============================================================================

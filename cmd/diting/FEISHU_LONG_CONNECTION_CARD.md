@@ -14,7 +14,7 @@
    - 订阅事件中勾选 **card.action.trigger**（卡片回传），点击只走长连接，不走 HTTP 回调。
 
 2. **配置**
-   - `config.acceptance.yaml` 或 YAML 中：
+   - config.yaml / config.example.yaml 中：
      - `delivery.feishu.use_card_delivery: true` → 审批消息改为**交互卡片**（带「批准」「拒绝」按钮）。
      - `delivery.feishu.use_long_connection: true` → 启动时建立飞书 WebSocket 长连接。
    - 或环境变量：`DITING_FEISHU_USE_CARD_DELIVERY=true`、`DITING_FEISHU_USE_LONG_CONNECTION=true`。
@@ -22,7 +22,7 @@
 
 3. **启动**
    ```bash
-   cd cmd/diting && go run ./cmd/diting_allinone/ -config config.acceptance.yaml
+   cd cmd/diting && go run ./cmd/diting_allinone/
    ```
    日志中应出现：`飞书长连接已建立` / `飞书长连接已启动（卡片交互事件将在此处理）`。
 

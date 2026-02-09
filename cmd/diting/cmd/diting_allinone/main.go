@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"diting/internal/audit"
 	"diting/internal/cheq"
@@ -22,19 +23,46 @@ import (
 func main() {
 	configPath := flag.String("config", "", "path to config.yaml (or set CONFIG_PATH)")
 	flag.Parse()
-	// 配置优先级：.env（覆盖）> config.json（已有飞书等配置）> YAML 内默认
+
+	// 工作目录：watch/air 下 cwd 可能不是 cmd/diting，用可执行文件所在目录的上级作为配置根
+	workDir := "."
+	if execPath, err := os.Executable(); err == nil {
+		parent := filepath.Clean(filepath.Join(filepath.Dir(execPath), ".."))
+		if _, err := os.Stat(filepath.Join(parent, ".env")); err == nil {
+			workDir = parent
+			_ = os.Chdir(workDir)
+			fmt.Fprintf(os.Stderr, "[diting] 工作目录: %s（由可执行文件位置推断，watch 下可正确加载 .env）\n", workDir)
+		}
+	}
+	// 配置：.env 覆盖敏感项；主配置仅 YAML（路径已相对于 workDir）
 	_ = config.LoadEnvFile(".env", true)
-	_ = config.LoadEnvFromConfigJSON("config.json")
 	if *configPath == "" {
 		*configPath = os.Getenv("CONFIG_PATH")
 	}
 	if *configPath == "" {
-		*configPath = "config.example.yaml"
+		if _, err := os.Stat("config.yaml"); err == nil {
+			*configPath = "config.yaml"
+		} else {
+			*configPath = "config.example.yaml"
+		}
 	}
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "config load: %v\n", err)
 		os.Exit(1)
+	}
+
+	// 本地调试：配置来源与飞书投递诊断（不打印敏感值）
+	if _, err := os.Stat(".env"); err == nil {
+		fmt.Fprintf(os.Stderr, "[diting] 配置: .env 已加载\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "[diting] 配置: .env 未找到（本地调试可复制 .env.example 为 .env 并填写 DITING_FEISHU_APP_ID、DITING_FEISHU_APP_SECRET、DITING_FEISHU_APPROVAL_USER_ID 或 DITING_FEISHU_CHAT_ID）\n")
+	}
+	fmt.Fprintf(os.Stderr, "[diting] 配置: YAML=%s\n", *configPath)
+	if cfg.Delivery.Feishu.Enabled {
+		hasApp := cfg.Delivery.Feishu.AppID != "" && cfg.Delivery.Feishu.AppSecret != ""
+		hasTarget := cfg.Delivery.Feishu.ApprovalUserID != "" || cfg.Delivery.Feishu.ChatID != ""
+		fmt.Fprintf(os.Stderr, "[diting] 飞书: app_id/app_secret=%v, approval_user_id或chat_id=%v\n", hasApp, hasTarget)
 	}
 
 	// 策略：有规则路径则用内置引擎，否则占位恒放行
