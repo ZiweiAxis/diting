@@ -110,15 +110,16 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 		if !p.reviewRequiresApproval {
 			_ = p.cheq.Submit(ctx, obj.ID, true)
 			rp.ServeHTTP(wrap, r)
-			p.appendEvidence(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason)
+			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason, string(models.ConfirmationStatusApproved), obj.ConfirmerIDs)
 			break
 		}
 		_, _ = fmt.Fprintf(os.Stderr, "[diting] CHEQ 待确认 id=%s 批准: http://localhost:8080/cheq/approve?id=%s&approved=true 拒绝: http://localhost:8080/cheq/approve?id=%s&approved=false\n", obj.ID, obj.ID, obj.ID)
 		deadline := time.Now().Add(time.Duration(timeoutSec) * time.Second)
 		var finalStatus string
 		var reminded bool
+		var o *models.ConfirmationObject
 		for time.Now().Before(deadline) {
-			o, _ := p.cheq.GetByID(ctx, obj.ID)
+			o, _ = p.cheq.GetByID(ctx, obj.ID)
 			if o == nil {
 				time.Sleep(2 * time.Second)
 				continue
@@ -133,15 +134,19 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 			}
 			time.Sleep(2 * time.Second)
 		}
+		var confirmerIDs []string
+		if o != nil {
+			confirmerIDs = o.ConfirmerIDs
+		}
 		if finalStatus == string(models.ConfirmationStatusApproved) {
 			rp.ServeHTTP(wrap, r)
-			p.appendEvidence(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason)
+			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason, finalStatus, confirmerIDs)
 		} else {
 			wrap.WriteHeader(http.StatusForbidden)
 			if finalStatus == "" {
 				finalStatus = "expired"
 			}
-			p.appendEvidence(ctx, traceID, reqCtx, finalStatus, decision.PolicyRuleID, decision.DecisionReason)
+			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, finalStatus, decision.PolicyRuleID, decision.DecisionReason, finalStatus, confirmerIDs)
 			_, _ = wrap.Write([]byte("confirmation " + finalStatus))
 		}
 	default:
@@ -169,12 +174,22 @@ func containsString(slice []string, s string) bool {
 }
 
 func (p *pipeline) appendEvidence(ctx context.Context, traceID string, req *models.RequestContext, decision, policyRuleID, reason string) {
+	p.appendEvidenceWithCHEQ(ctx, traceID, req, decision, policyRuleID, reason, "", nil)
+}
+
+func (p *pipeline) appendEvidenceWithCHEQ(ctx context.Context, traceID string, req *models.RequestContext, decision, policyRuleID, reason, cheqStatus string, confirmerIDs []string) {
+	confirmer := ""
+	if len(confirmerIDs) > 0 {
+		confirmer = strings.Join(confirmerIDs, ",")
+	}
 	_ = p.audit.Append(ctx, &models.Evidence{
 		TraceID:        traceID,
 		AgentID:        req.AgentIdentity,
 		PolicyRuleID:   policyRuleID,
 		DecisionReason: reason,
 		Decision:       decision,
+		CHEQStatus:     cheqStatus,
+		Confirmer:      confirmer,
 		Timestamp:      time.Now(),
 		Resource:       req.Resource,
 		Action:         req.Action,

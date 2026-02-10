@@ -124,7 +124,7 @@ func main() {
 	}
 	var auditStore audit.Store
 	if cfg.Audit.Path != "" {
-		as, err := audit.NewJSONLStore(cfg.Audit.Path)
+		as, err := audit.NewJSONLStore(cfg.Audit.Path, cfg.Audit.Redact)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "audit store: %v\n", err)
 			os.Exit(1)
