@@ -5,10 +5,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"diting/internal/audit"
 	"diting/internal/cheq"
@@ -123,6 +125,27 @@ func main() {
 	srv := proxy.NewServer(cfg, policyEngine, cheqEngine, deliveryProvider, auditStore, ownershipResolver, reviewRequiresApproval)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	// SIGHUP 触发热加载策略规则（Story 2.4）
+	if pe, ok := policyEngine.(*policy.EngineImpl); ok {
+		sigReload := make(chan os.Signal, 1)
+		signal.Notify(sigReload, syscall.SIGHUP)
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-sigReload:
+					if err := pe.Reload(); err != nil {
+						log.Printf("[diting] policy reload failed: %v", err)
+					} else {
+						log.Printf("[diting] policy rules reloaded successfully")
+					}
+				}
+			}
+		}()
+		fmt.Fprintf(os.Stderr, "[diting] SIGHUP will reload policy rules\n")
+	}
 	if cfg.Delivery.Feishu.Enabled && cfg.Delivery.Feishu.UseLongConnection {
 		feishudelivery.RunLongConnection(ctx, cfg.Delivery.Feishu, func(cheqID string, approved bool) error {
 			return cheqEngine.Submit(context.Background(), cheqID, approved)

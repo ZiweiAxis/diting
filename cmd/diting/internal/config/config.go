@@ -32,10 +32,11 @@ type RiskConfig struct {
 	SafeDomains        []string `yaml:"safe_domains"`
 }
 
-// ProxyConfig 代理监听与上游。
+// ProxyConfig 代理监听与上游；L0 身份校验（MVP API Key）。
 type ProxyConfig struct {
-	ListenAddr string `yaml:"listen_addr"` // 如 :8080
-	Upstream   string `yaml:"upstream"`   // 上游 base URL
+	ListenAddr     string   `yaml:"listen_addr"`      // 如 :8080
+	Upstream       string   `yaml:"upstream"`         // 上游 base URL
+	AllowedAPIKeys []string `yaml:"allowed_api_keys"` // 允许的 L0 API Key 列表；空表示不强制 L0 校验
 }
 
 // PolicyConfig 策略引擎配置（规则路径、热加载等）。

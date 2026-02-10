@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"strings"
 	"time"
 
 	"diting/internal/audit"
@@ -38,6 +39,7 @@ type pipeline struct {
 	delivery               delivery.Provider
 	cheqTimeoutSec         int
 	reviewRequiresApproval bool
+	allowedAPIKeys         []string // 非空时启用 L0 校验：身份须在此列表中
 }
 
 func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *models.RequestContext, rp *httputil.ReverseProxy) {
@@ -47,17 +49,33 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 		traceID = "unknown"
 	}
 
-	// 3.2.1 L0 校验（可选）：此处不强制拒绝无身份请求，仅记录。
+	wrap := &responseWriterWithTraceID{ResponseWriter: w, traceID: traceID}
+
+	// 3.2.1 L0 校验：若配置了 allowed_api_keys，未携带或无效身份则拒绝并写审计。
+	if len(p.allowedAPIKeys) > 0 {
+		token := normalizeL0Token(reqCtx.AgentIdentity)
+		if token == "" {
+			p.appendEvidence(ctx, traceID, reqCtx, "l0_missing", "l0", "missing or empty agent identity")
+			wrap.WriteHeader(http.StatusUnauthorized)
+			_, _ = wrap.Write([]byte("missing or invalid agent identity"))
+			return
+		}
+		if !containsString(p.allowedAPIKeys, token) {
+			p.appendEvidence(ctx, traceID, reqCtx, "l0_invalid", "l0", "agent identity not in allowed list")
+			wrap.WriteHeader(http.StatusUnauthorized)
+			_, _ = wrap.Write([]byte("invalid agent identity"))
+			return
+		}
+	}
+
 	// 3.2.2 调用 PolicyEngine.Evaluate
 	decision, err := p.policy.Evaluate(ctx, reqCtx)
 	if err != nil {
 		p.appendEvidence(ctx, traceID, reqCtx, "error", "pdp_error", err.Error())
-		wrap := &responseWriterWithTraceID{ResponseWriter: w, traceID: traceID}
 		wrap.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	wrap := &responseWriterWithTraceID{ResponseWriter: w, traceID: traceID}
 	switch {
 	case decision.Allow():
 		// 3.2.3 allow：转发后写审计
@@ -130,6 +148,24 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 		p.appendEvidence(ctx, traceID, reqCtx, "unknown", decision.PolicyRuleID, decision.DecisionReason)
 		wrap.WriteHeader(http.StatusForbidden)
 	}
+}
+
+// normalizeL0Token 去掉 Authorization 的 "Bearer " 前缀，便于与配置的 key 比对。
+func normalizeL0Token(identity string) string {
+	s := strings.TrimSpace(identity)
+	if strings.HasPrefix(s, "Bearer ") {
+		s = strings.TrimSpace(strings.TrimPrefix(s, "Bearer "))
+	}
+	return s
+}
+
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *pipeline) appendEvidence(ctx context.Context, traceID string, req *models.RequestContext, decision, policyRuleID, reason string) {

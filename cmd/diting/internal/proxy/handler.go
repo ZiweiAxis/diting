@@ -38,6 +38,12 @@ func (s *Server) proxyHandler() http.HandlerFunc {
 		upstreamURL, _ = url.Parse("http://localhost:8081")
 	}
 	rp := httputil.NewSingleHostReverseProxy(upstreamURL)
+	rp.Director = func(outreq *http.Request) {
+		if id, ok := outreq.Context().Value(ctxKeyTraceID).(string); ok && id != "" {
+			outreq.Header.Set("traceparent", id)
+			outreq.Header.Set("X-Trace-ID", id)
+		}
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		traceID := r.Header.Get("traceparent")
 		if traceID == "" {

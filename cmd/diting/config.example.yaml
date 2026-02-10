@@ -4,6 +4,8 @@
 proxy:
   listen_addr: ":8080"
   upstream: "http://localhost:8081"
+  # L0 身份：空表示不强制；配置后仅允许列表中的 key（请求头 X-Agent-Token 或 Authorization，支持 Bearer <key>）
+  allowed_api_keys: []
 
 policy:
   rules_path: "policy_rules.example.yaml"
