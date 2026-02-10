@@ -24,6 +24,7 @@ import (
 
 func main() {
 	configPath := flag.String("config", "", "path to config.yaml (or set CONFIG_PATH)")
+	validateOnly := flag.Bool("validate", false, "load config (and policy rules if set), then exit 0 on success or 1 on error (Epic 4.1)")
 	flag.Parse()
 
 	// 工作目录：watch/air 下 cwd 可能不是 cmd/diting，用可执行文件所在目录的上级作为配置根
@@ -52,6 +53,17 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "config load: %v\n", err)
 		os.Exit(1)
+	}
+	if *validateOnly {
+		// 校验策略规则文件（若配置了）
+		if cfg.Policy.RulesPath != "" {
+			if _, err := policy.NewEngineImpl(cfg.Policy.RulesPath); err != nil {
+				fmt.Fprintf(os.Stderr, "policy rules validate: %v\n", err)
+				os.Exit(1)
+			}
+		}
+		fmt.Fprintf(os.Stderr, "[diting] config validate ok: %s\n", *configPath)
+		os.Exit(0)
 	}
 
 	// 本地调试：配置来源与飞书投递诊断（不打印敏感值）
