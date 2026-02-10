@@ -73,7 +73,38 @@ curl -s -X POST "http://localhost:8080/admin" -H "Host: example.com" -d '{}'
 
 - 飞书收到带「批准」「拒绝」的交互卡片。
 - 点击按钮后无 200340，审批结果经长连接回传。
-- 批准后请求放行（200），拒绝后请求被拒（403）。
+- 批准后请求被放行并转发至上游（上游未起或仅支持 GET 时可能为 502/501，属环境正常）；拒绝后请求被拒（403）。
 - 审计中可查到对应 trace 的 allow/deny 记录。
 
 全部满足即**闭环验收通过**。
+
+---
+
+## 飞书端到端验证（建议直接用 run_acceptance.sh）
+
+为避免“明明跑了验收却飞书收不到消息”的误会，本仓库统一用 `run_acceptance.sh` 做飞书闭环验收（含预检）。
+
+### 1. 预检（必须通过才会发到飞书）
+
+```bash
+cd cmd/diting
+./run_acceptance.sh preflight
+```
+
+### 2. 启动与触发
+
+```bash
+# 分步（推荐）
+./run_acceptance.sh start
+./run_acceptance.sh trigger
+
+# 一键
+./run_acceptance.sh full
+```
+
+### 3. 验收点
+
+- 飞书（或配置的群聊）收到一条待确认消息（文本链接或交互卡片）。
+- 点击批准后，Diting 会将请求转发到配置的上游（`proxy.upstream`，默认 `http://localhost:8081`）。若上游未起则返回 **502**；若上游为 `python3 -m http.server 8081`，因其不支持 POST，会返回 **501**（Unsupported method），均属正常，表示「批准→转发」已通。若要得到 **200**，需在 8081 起一个支持 POST 的上游。
+- 点击拒绝后应返回 **403**。
+- 日志中出现「飞书投递已启用」；若提示 open_id cross app，改用该应用下的 user_id 或配置 chat_id 兜底。

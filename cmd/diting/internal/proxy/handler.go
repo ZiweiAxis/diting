@@ -38,7 +38,12 @@ func (s *Server) proxyHandler() http.HandlerFunc {
 		upstreamURL, _ = url.Parse("http://localhost:8081")
 	}
 	rp := httputil.NewSingleHostReverseProxy(upstreamURL)
+	// 保留默认 Director（负责设置 scheme/host/path/query 等），在其基础上注入 trace 头。
+	origDirector := rp.Director
 	rp.Director = func(outreq *http.Request) {
+		if origDirector != nil {
+			origDirector(outreq)
+		}
 		if id, ok := outreq.Context().Value(ctxKeyTraceID).(string); ok && id != "" {
 			outreq.Header.Set("traceparent", id)
 			outreq.Header.Set("X-Trace-ID", id)
