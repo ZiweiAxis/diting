@@ -9,7 +9,7 @@ COPY cmd/diting/ ./
 RUN CGO_ENABLED=0 go build -o diting ./cmd/diting_allinone
 
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates wget
 WORKDIR /app
 COPY --from=builder /build/diting /app/diting
 COPY cmd/diting/config.example.yaml /app/config.example.yaml
