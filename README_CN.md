@@ -1,10 +1,10 @@
-# Diting (谛听)
+# Diting 3AF (谛听 3AF)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/dl/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
-**企业级 AI 智能体零信任治理平台**
+**Diting 3AF：AI Agent 审计与防火墙（企业级智能体零信任治理平台）**
 
 **谛听** - 中国神话中的神兽，能辨别真假善恶，倾听世间万物之声。本平台作为 AI Agent 的守护者，确保其操作安全可信。
 
@@ -16,7 +16,7 @@
 
 ## 🎯 项目概述
 
-Diting（谛听）是一个企业级 AI 安全治理平台，通过智能反向代理拦截和治理 AI Agent 的 API 调用，让 AI Agent 安全、可控、合规地运行。
+Diting 3AF（谛听 3AF）是一个企业级 AI 安全治理平台，本质上是面向 AI Agent 的**审计与防火墙（AI Agent Audit & Firewall）**：通过智能反向代理拦截和治理 AI Agent 的 API 调用，让 AI Agent 安全、可控、合规地运行。
 
 ### 核心特性
 
@@ -27,6 +27,19 @@ Diting（谛听）是一个企业级 AI 安全治理平台，通过智能反向�
 - ✅ **人机协同** - 高风险操作人工审批
 - ✅ **全链路审计** - 每个操作可追溯，满足合规要求
 - ✅ **高性能** - Go 语言构建，处理 2000+ req/s
+
+### 3AF 是什么？—— 多维度解读
+
+**3AF** 即 **AI Agent Audit & Firewall**（AI 智能体审计与防火墙）。读音谐音 **Safe**（安全）—— 目标就是让 AI 智能体的每一次出网调用都**安全、可审计、可控**。
+
+| 维度 | 含义 |
+|------|------|
+| **产品名** | **3**AF = **A**I **A**gent **A**udit & **F**irewall：在智能体与外部 API 之间的审计与防火墙。 |
+| **设计** | **3** 层控制：L0 身份 → L1/L2 策略 → CHEQ 人工确认；**A**udit 全量审计；**F**irewall 按策略放行/拒绝。 |
+| **使命** | **Safe**（谐音）：让智能体流量 **Safe** —— 可追溯（审计）、可管控（防火墙）、身份可知（Agent）。 |
+| **零信任** | 永不信任、始终校验：识别 Agent（A）、执行策略（F）、全程留痕（A）。 |
+
+更多：[3AF — 产品理念与多维度解读](docs/diting/3AF_OVERVIEW_CN.md)（[English](docs/diting/3AF_OVERVIEW.md)）。
 
 ---
 
@@ -316,6 +329,8 @@ go test ./...
 ## 🐉 关于名字
 
 **谛听（Diting）** 是中国佛教神话中的神兽，地藏菩萨的坐骑。它拥有辨别真假善恶的超凡能力，能够倾听世间万物之声。这完美体现了我们平台的使命：以智慧和精准治理 AI Agent 的行为。
+
+**3AF** 谐音 **Safe**（安全）：我们希望通过审计（可追溯）、防火墙（可控）、智能体身份（可知）让每一次调用都 **Safe**。
 
 ---
 

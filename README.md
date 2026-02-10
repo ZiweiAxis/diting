@@ -1,10 +1,10 @@
-# Diting (谛听)
+# Diting 3AF (谛听 3AF)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go 1.21+](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/dl/)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
-**Enterprise-grade AI Agent Zero-Trust Governance Platform**
+**Diting 3AF – AI Agent Audit & Firewall（Enterprise-grade AI Agent Zero-Trust Governance Platform）**
 
 **谛听 (Diting)** - A mythical creature in Chinese mythology that can distinguish truth from falsehood, good from evil. This platform acts as a guardian for AI agents, ensuring their operations are safe and trustworthy.
 
@@ -16,7 +16,7 @@
 
 ## 🎯 Overview
 
-Diting is an enterprise-grade AI security governance platform that intercepts and governs AI Agent API calls through intelligent reverse proxy, enabling AI Agents to run securely, controllably, and compliantly.
+Diting 3AF is an enterprise-grade AI security governance platform — an **AI Agent Audit & Firewall** — that intercepts and governs AI Agent API calls through intelligent reverse proxy, enabling AI Agents to run securely, controllably, and compliantly.
 
 ### Key Features
 
@@ -27,6 +27,19 @@ Diting is an enterprise-grade AI security governance platform that intercepts an
 - ✅ **Human-in-the-Loop** - Manual approval for high-risk operations
 - ✅ **Full Audit Trail** - Every operation is traceable for compliance
 - ✅ **High Performance** - Built with Go, handles 2000+ req/s
+
+### What is 3AF? — Multi-dimensional meaning
+
+**3AF** stands for **AI Agent Audit & Firewall**. The name also sounds like **Safe** — our goal is to keep AI agent operations safe, auditable, and under control.
+
+| Dimension | Meaning |
+|-----------|--------|
+| **Product name** | **3**AF = **AI Agent** **A**udit & **F**irewall: an audit and firewall layer in front of AI agents. |
+| **Design** | **3** layers of control: L0 identity → L1/L2 policy → CHEQ (human confirmation); **A**udit for every decision; **F**irewall to allow/deny by policy. |
+| **Mission** | **Safe** (谐音): make agent-outbound traffic **safe** — accountable (audit), controllable (firewall), and identity-aware (agent). |
+| **Zero-trust** | Never trust, always verify: identify the agent (A), enforce policy (F), and record everything (A). |
+
+More: [3AF — product philosophy & dimensions](docs/diting/3AF_OVERVIEW.md)（[中文](docs/diting/3AF_OVERVIEW_CN.md)）.
 
 ---
 
@@ -315,6 +328,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🐉 About the Name
 
 **Diting (谛听)** is a divine creature in Chinese Buddhist mythology, known as the mount of Ksitigarbha Bodhisattva. It possesses the supernatural ability to distinguish truth from falsehood, good from evil, and can hear all sounds in the world. This perfectly embodies our platform's mission: to discern and govern AI agent behaviors with wisdom and precision.
+
+**3AF** doubles as a homophone for **Safe**: we aim to make every agent call **safe** — through Audit (accountability), Firewall (control), and Agent-scoped identity (who is calling).
 
 ---
 
