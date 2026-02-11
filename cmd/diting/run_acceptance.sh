@@ -124,16 +124,27 @@ start_server() {
   fi
   echo ""
   echo "请在同一机器另一终端执行触发请求（在 120 秒内到飞书点击批准/拒绝）："
-  echo "  curl -s -X POST 'http://localhost:8080/admin' -H 'Host: example.com' -d '{}' -w '\\nHTTP %{http_code}\\n'"
+  echo "  原有审理: $0 trigger        # POST /admin → 飞书审批"
+  echo "  新逻辑:   $0 trigger_exec   # POST /auth/exec (exec:sudo) → 飞书审批"
   echo ""
-  echo "或在本脚本中执行: $0 trigger"
 }
 
 trigger_request() {
-  echo "[验收] 触发 POST /admin（等待审批，最多 125 秒）..."
+  echo "[验收] 触发 POST /admin（原有审理：HTTP 代理，等待审批，最多 125 秒）..."
   curl -s -X POST "http://localhost:8080/admin" -H "Host: example.com" -d '{}' --max-time 125 -w "\nHTTP %{http_code}\n" -o /tmp/diting_acceptance_response.txt || true
   echo "[验收] 响应："
   cat /tmp/diting_acceptance_response.txt
+}
+
+# 触发执行层审批（新逻辑）：POST /auth/exec 且 action=exec:sudo → review → 飞书卡片，与原有审理共用 CHEQ/飞书
+trigger_exec_request() {
+  echo "[验收] 触发 POST /auth/exec（新逻辑：执行层审批，exec:sudo → review，等待审批，最多 125 秒）..."
+  curl -s -X POST "http://localhost:8080/auth/exec" \
+    -H "Content-Type: application/json" \
+    -d '{"subject":"test","action":"exec:sudo","resource":"local://host","command_line":"sudo echo ok"}' \
+    --max-time 125 -w "\nHTTP %{http_code}\n" -o /tmp/diting_acceptance_exec_response.txt || true
+  echo "[验收] 响应："
+  cat /tmp/diting_acceptance_exec_response.txt
 }
 
 full_flow() {
@@ -143,6 +154,24 @@ full_flow() {
   echo ""
   trigger_request
   echo ""
+  echo "[验收] 若需要停止服务：$0 stop"
+}
+
+# 飞书双路径验收：先触发原有审理（/admin），等用户点击后再触发新逻辑（/auth/exec exec:sudo）
+full_flow_feishu() {
+  start_server
+  echo ""
+  echo "[验收] === Phase 1：原有审理（HTTP 代理 POST /admin）==="
+  echo "[验收] 请在收到飞书卡片后点击「批准」或「拒绝」，请求将在点击后返回。"
+  echo ""
+  trigger_request
+  echo ""
+  echo "[验收] === Phase 2：新逻辑审批（执行层 POST /auth/exec exec:sudo）==="
+  echo "[验收] 请再次到飞书点击新卡片的「批准」或「拒绝」。"
+  echo ""
+  trigger_exec_request
+  echo ""
+  echo "[验收] 飞书双路径验收完成。若需查审计：./query_audit.sh -n 5 或按 trace_id 查询。"
   echo "[验收] 若需要停止服务：$0 stop"
 }
 
@@ -160,18 +189,22 @@ stop_server() {
 }
 
 case "${1:-start}" in
-  preflight) preflight ;;
-  start)  start_server ;;
-  trigger) trigger_request ;;
-  full)  full_flow ;;
-  stop)   stop_server ;;
+  preflight)      preflight ;;
+  start)          start_server ;;
+  trigger)        trigger_request ;;
+  trigger_exec)   trigger_exec_request ;;
+  full)           full_flow ;;
+  full_feishu)    full_flow_feishu ;;
+  stop)           stop_server ;;
   *)
-    echo "用法: $0 { preflight | start | trigger | full | stop }"
-    echo "  preflight - 检查 .env 与配置是否满足飞书收消息"
-    echo "  start   - 释放 8080、启动服务并提示触发命令"
-    echo "  trigger - 发送 POST /admin 等待审批（需先在飞书点击）"
-    echo "  full    - start + trigger（需在 125 秒内到飞书点击批准/拒绝）"
-    echo "  stop    - 停止验收启动的服务"
+    echo "用法: $0 { preflight | start | trigger | trigger_exec | full | full_feishu | stop }"
+    echo "  preflight    - 检查 .env 与配置是否满足飞书收消息"
+    echo "  start        - 释放 8080、启动服务并提示触发命令"
+    echo "  trigger      - 原有审理：POST /admin，等待飞书点击"
+    echo "  trigger_exec - 新逻辑：POST /auth/exec (exec:sudo)，等待飞书点击"
+    echo "  full         - start + trigger（需在 125 秒内到飞书点击批准/拒绝）"
+    echo "  full_feishu  - 飞书双路径验收：先 trigger 再 trigger_exec（两次飞书点击）"
+    echo "  stop         - 停止验收启动的服务"
     exit 1
     ;;
 esac

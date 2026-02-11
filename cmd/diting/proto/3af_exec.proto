@@ -1,0 +1,179 @@
+// 3AF Exec API - AI Agent Audit & Firewall
+// 基础设施层契约：同机 UDS (SO_PEERCRED) + 跨机 gRPC (mTLS)
+// 方案定位：Docker/混合环境安全内核
+syntax = "proto3";
+
+package diting.v1;
+
+option go_package = "diting/proto;ditingpb";
+
+// ==========================================
+// 核心模型定义
+// ==========================================
+
+// RequestContext 3.0：策略引擎的统一输入
+message RequestContext {
+  string subject = 1;   // Agent ID / Sandbox ID
+  string action = 2;    // 核心动作: exec:run, exec:fs.write, exec:net.connect, exec:sudo
+  string resource = 3;  // 资源标识: docker://<container_id>, local://<host>
+  map<string, string> context = 4; // 上下文: command, args, cwd, env_vars, parent_pid
+}
+
+// 物理身份凭证 (服务端通过 UDS syscall 提取，或 mTLS 证书映射)
+// 实现约束：使用 UDS 时，服务端必须忽略 Request 中客户端填充的 PeerCred，
+// 强制通过 getsockopt(SO_PEERCRED) 从连接提取；Request 中本字段仅用于跨机调试或存根
+message PeerCred {
+  uint32 uid = 1;
+  uint32 gid = 2;
+  int64 pid = 3;
+  string container_id = 4; // 若能从 cgroup 提取则由服务端填充
+}
+
+// 跨机/长连接会话令牌
+message SessionToken {
+  string token = 1;
+  int64 expires_at_unix_sec = 2;
+  string sandbox_id = 3;
+}
+
+// ==========================================
+// 沙箱 Profile 与 预授权 (Config Plane)
+// ==========================================
+
+message SandboxBoundary {
+  bool network_enabled = 1;
+  repeated string fs_writable_paths = 2;
+  string syscall_preset = 3;   // 如 "default", "restricted"
+  int64 max_memory_mb = 4;
+  bool readonly_root = 5;
+}
+
+enum DegradationPolicy {
+  DEGRADATION_UNSPECIFIED = 0;
+  FAIL_OPEN = 1;  // 3AF 挂了 -> 放行 (业务优先)
+  FAIL_CLOSE = 2; // 3AF 挂了 -> 拒绝 (安全优先)
+}
+
+// Hot Cache: 本地快速放行规则
+message HotCacheAction {
+  string executable = 1;       // 精确匹配，如 "/bin/ls"
+  repeated string argv_allowlist = 2; // 参数白名单，空则不限
+  bool run_as_sudo = 3;        // 命中后，Agent 是否自动提权执行
+}
+
+// Sudo 专用预授权 (针对运维类复杂命令)
+// 实现约束：Node Agent 应对 command_line 做参数解析 (Tokenization) 后再与 command_pattern 匹配，
+// 或约定 command_pattern 使用 Glob 规范，避免多空格等绕过 (如 apt-get  install)
+message SudoHotCacheEntry {
+  string command_pattern = 1;  // 支持 Glob，如 "systemctl restart *"
+  string run_as_user = 2;      // 默认 "root"，也可为 "www-data" 等
+  string description = 3;
+}
+
+// 策略下沉：加密的基础策略副本（可选，用于离线/逃生）
+message PolicySnapshot {
+  bytes encrypted_payload = 1;
+  string version = 2;
+  int64 valid_until_unix_sec = 3;
+}
+
+message SandboxProfile {
+  string profile_id = 1;
+  string version = 2;          // 版本/哈希，用于检测配置漂移与 Hot Cache 失效
+  SandboxBoundary boundary = 3;
+  repeated HotCacheAction hot_cache_actions = 4;
+  repeated SudoHotCacheEntry sudo_hot_cache = 5;
+  DegradationPolicy degradation_policy = 6;
+  SessionToken session_token = 7;
+  PolicySnapshot policy_snapshot = 8; // 可选，故障逃生时使用
+}
+
+message GetSandboxProfileRequest {
+  string resource = 1;        // 如 docker://project-a/dev 或 local://host-01
+  string agent_version = 2;   // Agent 版本，便于服务端做兼容性判断
+  // PeerCred 由传输层注入，不在此请求中；跨机时使用 Metadata/Token
+}
+
+message GetSandboxProfileResponse {
+  SandboxProfile profile = 1;
+}
+
+// ==========================================
+// 执行鉴权 (Runtime Plane)
+// ==========================================
+
+message ExecAuthRequest {
+  RequestContext ctx = 1;
+  string command_line = 2;    // 完整命令行 (用于审计)
+  string working_dir = 3;
+  string parent_process = 4;
+  string trace_id = 5;        // 分布式追踪 ID
+  map<string, string> env = 6; // 环境变量快照 (可选，用于敏感信息检查)
+}
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  ALLOW = 1;
+  DENY = 2;
+  REVIEW = 3; // 进入 pending 状态
+}
+
+message ExecAuthResponse {
+  Decision decision = 1;
+  string policy_rule_id = 2;
+  string reason = 3;
+  string cheq_id = 4;
+  int32 approval_timeout_sec = 5;
+  map<string, string> audit_metadata = 6; // 审计元数据，如 "record_stdout": "true"
+}
+
+// ==========================================
+// 双向流审批 (Streaming Plane)
+// ==========================================
+
+message AuthStreamRequest {
+  string request_id = 1; // 客户端生成，用于关联 Response
+  oneof payload {
+    AuthStreamInit init = 2;   // 握手包 (连接建立首包)，传 client_id/resource/跨机 Token
+    ExecAuthRequest auth = 3;  // 鉴权请求
+    string ping = 4;           // 心跳
+  }
+}
+
+message AuthStreamInit {
+  string client_id = 1;
+  string resource = 2;
+  string agent_version = 3;
+  // 跨机时 Token 放在此处或 gRPC Metadata Header 中
+}
+
+message AuthStreamResponse {
+  string request_id = 1; // 对应 Request 中的 ID
+  oneof payload {
+    ExecAuthResponse immediate = 2;      // 立即结果 (Allow/Deny/Review_Wait)
+    AuthStreamApprovalPush approval_push = 3; // 异步推送：Review 完成后的最终结果
+    SandboxProfile profile_update = 4;   // 服务端推送配置更新 (如紧急封禁)，Hot Cache 应失效或更新
+    string pong = 5;                     // 心跳响应
+  }
+}
+
+message AuthStreamApprovalPush {
+  string cheq_id = 1;
+  Decision final_decision = 2;
+  string reason = 3;
+}
+
+// ==========================================
+// 服务定义
+// ==========================================
+
+service ExecAuthService {
+  // 冷启动：拉取全量配置
+  rpc GetSandboxProfile(GetSandboxProfileRequest) returns (GetSandboxProfileResponse);
+
+  // 简单调用：适用于 Wrapper 或短连接场景
+  rpc ExecAuth(ExecAuthRequest) returns (ExecAuthResponse);
+
+  // 核心模式：长连接双向流 (支持异步审批、配置热推)
+  rpc AuthStream(stream AuthStreamRequest) returns (stream AuthStreamResponse);
+}

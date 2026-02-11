@@ -96,15 +96,20 @@ cd cmd/diting
 ```bash
 # 分步（推荐）
 ./run_acceptance.sh start
-./run_acceptance.sh trigger
+./run_acceptance.sh trigger      # 原有审理：POST /admin
+./run_acceptance.sh trigger_exec # 新逻辑：POST /auth/exec (exec:sudo)
 
-# 一键
+# 一键（单路径）
 ./run_acceptance.sh full
+
+# 飞书双路径一键（原有 + 新逻辑，共两次飞书点击）
+./run_acceptance.sh full_feishu
+# 或
+./scripts/verify_feishu_approval.sh full
 ```
 
 ### 3. 验收点
 
-- 飞书（或配置的群聊）收到一条待确认消息（文本链接或交互卡片）。
-- 点击批准后，Diting 会将请求转发到配置的上游（`proxy.upstream`，默认 `http://localhost:8081`）。若上游未起则返回 **502**；若上游为 `python3 -m http.server 8081`，因其不支持 POST，会返回 **501**（Unsupported method），均属正常，表示「批准→转发」已通。若要得到 **200**，需在 8081 起一个支持 POST 的上游。
-- 点击拒绝后应返回 **403**。
-- 日志中出现「飞书投递已启用」；若提示 open_id cross app，改用该应用下的 user_id 或配置 chat_id 兜底。
+- **原有审理**（`trigger` / POST /admin）：飞书收到待确认卡片；点击批准后请求放行（可能 200/502/501 取决于上游），点击拒绝返回 **403**。
+- **新逻辑**（`trigger_exec` / POST /auth/exec exec:sudo）：飞书再收到一条待确认卡片；点击批准后响应 `{"decision":"allow",...}`，点击拒绝为 `{"decision":"deny",...}`。
+- 两条路径共用同一 CHEQ、同一飞书投递与长连接；日志中出现「飞书投递已启用」「飞书长连接已建立」；若提示 open_id cross app，改用该应用下的 user_id 或配置 chat_id 兜底。

@@ -12,6 +12,8 @@
 | **test.sh** | 用 curl 经代理(8081)测 GET/POST/DELETE/HTTPS，验证自动放行与需审批流程。 |
 | **test_feishu.sh** | 检查 config.yaml、.env、bin/diting，提示飞书集成测试步骤并可选启动 diting。 |
 | **run-with-feishu.sh** | 检查 DITING_FEISHU_* 环境变量后启动 `./bin/diting`，用于验收飞书审批。 |
+| **verify_feishu_approval.sh** | 飞书审批双路径验证：原有审理（POST /admin）+ 新逻辑（POST /auth/exec exec:sudo）；`full` 为一键两次飞书点击。 |
+| **verify_exec.sh** | 执行层验证（无需飞书）：POST /auth/exec、GET /auth/sandbox-profile、3af-exec echo。 |
 
 ---
 

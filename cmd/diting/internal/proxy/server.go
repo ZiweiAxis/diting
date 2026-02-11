@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"diting/internal/audit"
 	"diting/internal/cheq"
 	"diting/internal/config"
@@ -46,8 +48,8 @@ func NewServer(
 	}
 }
 
-// Serve 启动 HTTP 服务：/healthz、/readyz 与代理监听（Phase 2 代理先返回 503）。
-func (s *Server) Serve(ctx context.Context) error {
+// Handler 返回用于注册路由的 HTTP Handler，供测试或外部嵌入使用。
+func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -60,13 +62,20 @@ func (s *Server) Serve(ctx context.Context) error {
 	mux.HandleFunc("/debug/audit", s.debugAuditHandler())
 	mux.HandleFunc("/cheq/approve", s.cheqApproveHandler())
 	mux.HandleFunc("/feishu/card", s.feishuCardHandler())
+	mux.HandleFunc("/auth/exec", s.execAuthHandler())
+	mux.HandleFunc("/auth/sandbox-profile", s.sandboxProfileHandler())
+	mux.HandleFunc("/auth/stream", s.authStreamHandler())
 	mux.Handle("/", s.proxyHandler())
+	return mux
+}
 
+// Serve 启动 HTTP 服务：/healthz、/readyz 与代理监听（Phase 2 代理先返回 503）。
+func (s *Server) Serve(ctx context.Context) error {
 	addr := s.cfg.Proxy.ListenAddr
 	if addr == "" {
 		addr = ":8080"
 	}
-	server := &http.Server{Addr: addr, Handler: mux}
+	server := &http.Server{Addr: addr, Handler: s.Handler()}
 	go func() {
 		<-ctx.Done()
 		_ = server.Shutdown(context.Background())
@@ -131,6 +140,60 @@ func (s *Server) cheqApproveHandler() http.HandlerFunc {
 			approvedJSON = "true"
 		}
 		_, _ = w.Write([]byte(`{"ok":true,"approved":` + approvedJSON + `}`))
+	}
+}
+
+// execAuthHandler 处理 POST /auth/exec 执行能力鉴权；与 HTTP 代理共用 Policy、CHEQ、Audit（Story 7.1、7.2）。
+func (s *Server) execAuthHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var body ExecAuthRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid json"}`))
+			return
+		}
+		traceID := body.TraceID
+		if traceID == "" {
+			traceID = r.Header.Get("traceparent")
+		}
+		if traceID == "" {
+			traceID = r.Header.Get("X-Trace-ID")
+		}
+		if traceID == "" {
+			traceID = uuid.New().String()
+		}
+		agentIdentity := r.Header.Get("X-Agent-Token")
+		if agentIdentity == "" {
+			agentIdentity = r.Header.Get("Authorization")
+		}
+		if body.Subject != "" {
+			agentIdentity = body.Subject
+		}
+		reqCtx := BuildRequestContextFromExec(&body, agentIdentity)
+		if reqCtx == nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"missing subject/action/resource"}`))
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxKeyTraceID, traceID)
+		resp, err := s.pipeline.ExecEvaluate(ctx, traceID, reqCtx)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"evaluate failed"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Trace-ID", traceID)
+		if resp.Decision == "allow" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusForbidden)
+		}
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
 

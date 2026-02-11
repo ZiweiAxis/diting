@@ -18,5 +18,6 @@ type RequestContext struct {
 	Action string
 	// Headers 请求头副本，可含 traceparent、X-Agent-Token 等。
 	Headers http.Header
-	// 可扩展：Subject、Context 等 AuthZEN 字段可从 Headers/AgentIdentity 解析后填入。
+	// Context 扩展上下文（可选），用于 exec 请求的 command_line、working_dir、env 等。
+	Context map[string]string
 }

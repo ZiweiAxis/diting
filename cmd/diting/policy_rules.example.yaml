@@ -1,7 +1,18 @@
 # 策略规则示例：按顺序匹配，第一条命中即生效；无命中则默认拒绝。
 # 将此类文件路径填入 config 的 policy.rules_path。
+# 执行层（3AF Exec）：action 使用 exec:run、exec:sudo 等与 proto 一致。
 
 rules:
+  - id: allow_exec_run
+    action: "exec:run"
+    resource: "*"
+    decision: allow
+    reason: 本地执行放行（Story 7/8 验收）
+  - id: review_exec_sudo
+    action: "exec:sudo"
+    resource: "*"
+    decision: review
+    reason: sudo 需人工确认
   - id: review_dangerous
     action: "*"
     resource: "/admin"
