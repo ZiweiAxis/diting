@@ -22,6 +22,34 @@ make run
 
 ---
 
+## 验证补充
+
+### 执行层验证（无需飞书）
+
+执行层接口与最小 Node Agent 可在无飞书环境下自验：
+
+```bash
+./scripts/verify_exec.sh
+```
+
+或分步：先启动 `./bin/diting`，再另一终端执行 `curl -s -X POST http://127.0.0.1:8080/auth/exec -H "Content-Type: application/json" -d '{"subject":"test","action":"exec:run","resource":"local://host","command_line":"echo ok"}'`、`curl -s "http://127.0.0.1:8080/auth/sandbox-profile?resource=local://host"`、`DITING_3AF_URL=http://127.0.0.1:8080 ./bin/3af-exec echo ok`（需先 `go build -o bin/3af-exec ./cmd/3af_exec`）。
+
+### 飞书审批验证（原有审理 + 新逻辑）
+
+两条路径共用同一 CHEQ、同一飞书投递；需先配置 `.env` 中飞书参数并确保 `cheq.persistence_path` 非空。
+
+```bash
+./run_acceptance.sh preflight
+./run_acceptance.sh trigger       # 原有审理：POST /admin
+./run_acceptance.sh trigger_exec  # 新逻辑：POST /auth/exec (exec:sudo)
+./run_acceptance.sh full_feishu   # 一键双路径（两次飞书点击）
+# 或：./scripts/verify_feishu_approval.sh full
+```
+
+详见 [ACCEPTANCE_CHECKLIST.md](ACCEPTANCE_CHECKLIST.md)。
+
+---
+
 ## 本目录文档（最少必要）
 
 | 文档 | 用途 |

@@ -73,7 +73,13 @@ make run
 - **需审批**：例如 `curl -x http://127.0.0.1:8080 -X DELETE https://httpbin.org/delete`，飞书收到消息或卡片后点击批准/拒绝，或访问 `http://localhost:8080/cheq/approve?id=<request_id>&approved=true`
 - **审计**：`curl -s "http://localhost:8080/debug/audit?trace_id=<X-Trace-ID>"`
 
-验收脚本：`./scripts/test.sh`（在 cmd/diting 下执行）。最小 3 步验证见仓库根 `_bmad-output/feishu-approval-minimal-verification.md`。
+验收脚本：`./scripts/test.sh`（在 cmd/diting 下执行）。
+
+### 验证补充：执行层（3AF）
+
+**执行层一键验证（无需飞书）**：在 `cmd/diting` 下执行 `./scripts/verify_exec.sh`，会构建并启动服务、调用 `POST /auth/exec`、`GET /auth/sandbox-profile`、运行 `3af-exec echo ok`。
+
+**飞书审批双路径**：`./run_acceptance.sh full_feishu` 或 `./scripts/verify_feishu_approval.sh full`，先触发原有审理（POST /admin），再触发新逻辑（POST /auth/exec exec:sudo），需在飞书点击两次卡片。详见 [ACCEPTANCE_CHECKLIST.md](../../cmd/diting/ACCEPTANCE_CHECKLIST.md)。
 
 ---
 
