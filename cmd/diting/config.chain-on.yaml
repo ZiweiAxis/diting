@@ -1,0 +1,9 @@
+# 联调用：仅覆盖 chain 段，链子模块开启（E-P7 联调时使用）
+# 用法：主配置 config.yaml 中 chain 段改为本文件内容，或合并进 config.yaml
+chain:
+  enabled: true
+  storage_path: "./data/chain"
+  merkle_batch_size: 0
+  audit_batch_enabled: false
+  audit_batch_size: 50
+  audit_batch_interval_sec: 30

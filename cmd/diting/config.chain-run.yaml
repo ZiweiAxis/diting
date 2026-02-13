@@ -1,0 +1,59 @@
+# 联调专用：与 config.example.yaml 一致，仅 chain.enabled: true
+# 用法: go run ./cmd/diting_allinone -config config.chain-run.yaml
+
+proxy:
+  listen_addr: ":8080"
+  upstream: "http://localhost:8081"
+  allowed_api_keys: []
+
+policy:
+  rules_path: "policy_rules.example.yaml"
+
+cheq:
+  timeout_seconds: 120
+  reminder_seconds_before_timeout: 60
+  persistence_path: "./data/cheq"
+
+delivery:
+  feishu:
+    app_id: ""
+    enabled: true
+    approval_user_id: ""
+    receive_id_type: ""
+    approval_timeout_minutes: 5
+    use_message_reply: true
+    poll_interval_seconds: 2
+    chat_id: ""
+    gateway_base_url: "http://localhost:8080"
+    use_card_delivery: true
+    use_long_connection: true
+    retry_max_attempts: 3
+    retry_initial_backoff_seconds: 1
+
+audit:
+  path: "./data/audit.jsonl"
+  redact: []
+
+ownership:
+  static_map: {}
+
+chain:
+  enabled: true
+  storage_path: "./data/chain"
+  merkle_batch_size: 0
+  audit_batch_enabled: false
+  audit_batch_size: 50
+  audit_batch_interval_sec: 30
+
+llm:
+  provider: anthropic
+  base_url: ""
+  api_key: ""
+  model: ""
+  max_tokens: 1024
+  temperature: 0.7
+risk:
+  dangerous_methods: ["DELETE", "PUT", "PATCH", "POST"]
+  dangerous_paths: ["/delete", "/remove", "/drop", "/destroy", "/clear", "/admin", "/production"]
+  auto_approve_methods: ["GET", "HEAD", "OPTIONS"]
+  safe_domains: ["api.github.com", "httpbin.org"]
