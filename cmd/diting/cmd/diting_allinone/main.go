@@ -11,8 +11,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"diting/internal/audit"
+	"diting/internal/chain"
 	"diting/internal/cheq"
 	"diting/internal/config"
 	"diting/internal/delivery"
@@ -20,6 +22,7 @@ import (
 	"diting/internal/ownership"
 	"diting/internal/policy"
 	"diting/internal/proxy"
+	chainpkg "diting/pkg/chain"
 )
 
 func main() {
@@ -133,8 +136,34 @@ func main() {
 	} else {
 		auditStore = audit.NewStubStore()
 	}
+	var ledger chainpkg.Ledger
+	var chainSrv *chain.Server
+	if cfg.Chain.Enabled {
+		store := chainpkg.NewLocalStoreWithPath(cfg.Chain.StoragePath)
+		ledger = chainpkg.NewLedger(store)
+		chainSrv = chain.NewServer(ledger)
+		if cfg.Chain.AuditBatchEnabled {
+			batchSize := cfg.Chain.AuditBatchSize
+			if batchSize <= 0 {
+				batchSize = 50
+			}
+			intervalSec := cfg.Chain.AuditBatchIntervalSec
+			if intervalSec <= 0 {
+				intervalSec = 30
+			}
+			bridge := chain.NewAuditChainBridge(auditStore, ledger, batchSize, time.Duration(intervalSec)*time.Second)
+			bridge.Start()
+			defer bridge.Stop()
+			auditStore = bridge
+			fmt.Fprintf(os.Stderr, "[diting] 审计存证上链已启用（batch_size=%d, interval=%ds）\n", batchSize, intervalSec)
+		}
+	}
 	reviewRequiresApproval := cfg.CHEQ.PersistencePath != "" // 使用持久化 CHEQ 时轮询等待确认
 	srv := proxy.NewServer(cfg, policyEngine, cheqEngine, deliveryProvider, auditStore, ownershipResolver, reviewRequiresApproval)
+	if cfg.Chain.Enabled {
+		srv.SetChainHandler(chainSrv.Handler())
+		fmt.Fprintf(os.Stderr, "[diting] 链子模块已启用，/chain/did/*、/chain/audit/*、/chain/health 可用\n")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 

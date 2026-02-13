@@ -65,8 +65,8 @@
 
 | ID | 标题 | 优先级 | 说明 |
 |----|------|--------|------|
-| I-016 | 私有链子模块规划与接口设计 | P2 | 紫微技术方案将私有链归属谛听；在 diting 内新增 pkg/chain 或 internal/chain，定义 DID 注册/查询与审计存证/验真 API，与 ziwei 技术方案 3.6 一致。 |
-| I-017 | 实现最小私有链 + DID/存证 API（一期） | P2 | 链抽象层 + 最小可用链（如日志+Merkle），暴露 POST/GET /chain/did/*、POST/GET /chain/audit/*；依赖 I-016。 |
+| I-016 | 私有链子模块规划与接口设计 | P2 | 紫微技术方案将私有链归属谛听；在 diting 内新增 pkg/chain 或 internal/chain，定义 DID 注册/查询与审计存证/验真 API，与 ziwei 技术方案 3.6 一致。设计见 `_bmad-output/planning-artifacts/chain-submodule-design-I016.md`。 | **In Progress**（2026-02-13 设计完成） |
+| I-017 | 实现最小私有链 + DID/存证 API（一期） | P2 | 链抽象层 + 最小可用链（如日志+Merkle），暴露 POST/GET /chain/did/*、POST/GET /chain/audit/*；依赖 I-016。拆为 **Epic 10**，Stories 10.1～10.6 见 `_bmad-output/planning-artifacts/epics.md` 与 `_bmad-output/implementation-artifacts/10-*.md`。 |
 | I-018 | 天枢对接：注册/心跳调用谛听 DID 接口 | P2 | 天枢（tianshu）在智能体注册与心跳流程中调用谛听链上 DID 接口；依赖 I-017。 |
 
 ---

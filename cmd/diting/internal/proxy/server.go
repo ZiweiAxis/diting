@@ -17,14 +17,16 @@ import (
 )
 
 // Server 持有策略、CHEQ、投递、审计、归属接口，并暴露探针与代理端口。
+// ChainHandler 可选：非 nil 时挂载 /chain/*（I-017）。
 type Server struct {
-	cfg      *config.Config
-	policy   policy.Engine
-	cheq     cheq.Engine
-	delivery delivery.Provider
-	audit    audit.Store
-	ownership ownership.Resolver
-	pipeline *pipeline
+	cfg          *config.Config
+	policy       policy.Engine
+	cheq         cheq.Engine
+	delivery     delivery.Provider
+	audit        audit.Store
+	ownership    ownership.Resolver
+	pipeline     *pipeline
+	chainHandler http.Handler
 }
 
 // NewServer 构造 Server；各组件由调用方注入。reviewRequiresApproval 为 true 时 review 路径轮询等待确认，否则立即放行（占位行为）。
@@ -54,6 +56,11 @@ func NewServer(
 	}
 }
 
+// SetChainHandler 设置 /chain/* 子模块 Handler（I-017）。调用方传入已处理 /chain 前缀后路径的 Handler。
+func (s *Server) SetChainHandler(h http.Handler) {
+	s.chainHandler = h
+}
+
 // Handler 返回用于注册路由的 HTTP Handler，供测试或外部嵌入使用。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -71,6 +78,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/auth/exec", s.execAuthHandler())
 	mux.HandleFunc("/auth/sandbox-profile", s.sandboxProfileHandler())
 	mux.HandleFunc("/auth/stream", s.authStreamHandler())
+	if s.chainHandler != nil {
+		mux.Handle("/chain/", http.StripPrefix("/chain", s.chainHandler))
+	}
 	mux.Handle("/", s.proxyHandler())
 	return mux
 }

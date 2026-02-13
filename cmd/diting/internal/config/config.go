@@ -9,9 +9,20 @@ type Config struct {
 	Delivery DeliveryConfig `yaml:"delivery"`
 	Audit    AuditConfig   `yaml:"audit"`
 	Ownership OwnershipConfig `yaml:"ownership"`
+	Chain    ChainConfig   `yaml:"chain,omitempty"` // 私有链与 DID/存证（I-017）
 	// 以下供 main_feishu / main 等入口使用（YAML 可选段）
 	LLM  *LLMConfig  `yaml:"llm,omitempty"`
 	Risk *RiskConfig `yaml:"risk,omitempty"`
+}
+
+// ChainConfig 链子模块配置（I-016 §7）。Enabled 为 true 时挂载 /chain/*。
+type ChainConfig struct {
+	Enabled                bool   `yaml:"enabled"`
+	StoragePath            string `yaml:"storage_path"`              // 持久化目录（dids/batches/proofs）；空则仅内存
+	MerkleBatchSize        int    `yaml:"merkle_batch_size"`          // 可选，批次大小提示；0 表示默认
+	AuditBatchEnabled      bool   `yaml:"audit_batch_enabled"`        // 审计 Trace 落库后按批上链（Story 10.6）
+	AuditBatchSize         int    `yaml:"audit_batch_size"`           // 每 N 条提交一批；0 表示默认 50
+	AuditBatchIntervalSec  int    `yaml:"audit_batch_interval_sec"`   // 定时提交间隔（秒）；0 表示默认 30
 }
 
 // LLMConfig 大模型配置（main_feishu 等用）。

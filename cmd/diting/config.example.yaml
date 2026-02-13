@@ -40,6 +40,16 @@ audit:
 ownership:
   static_map: {}
 
+# 链子模块（I-017）：DID 与存证 API；enabled 为 true 时挂载 /chain/*
+chain:
+  enabled: false
+  storage_path: "./data/chain"
+  merkle_batch_size: 0
+  # 审计 Trace 落库后按批上链（Story 10.6）；需 enabled: true 时生效
+  audit_batch_enabled: false
+  audit_batch_size: 50
+  audit_batch_interval_sec: 30
+
 # 以下供 main_feishu / main 等入口使用（All-in-One 可忽略）；敏感项由 .env 覆盖
 llm:
   provider: anthropic
