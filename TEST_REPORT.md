@@ -269,7 +269,7 @@ tar -C ~/go -xzf go1.21.6.linux-amd64.tar.gz --strip-components=1
 export PATH=$HOME/go/bin:$PATH
 
 # 2. 编译项目
-cd /home/dministrator/workspace/sentinel-ai/cmd/diting
+cd /home/dministrator/workspace/ziwei/diting/cmd/diting
 go mod tidy
 go build -o diting main.go
 

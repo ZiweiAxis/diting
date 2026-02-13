@@ -125,7 +125,11 @@ func (p *pipeline) ExecEvaluate(ctx context.Context, traceID string, req *models
 				finalStatus = string(o.Status)
 				break
 			}
-			if !reminded && p.delivery != nil && time.Until(o.ExpiresAt) <= 60*time.Second {
+			remindSec := p.reminderSecondsBeforeTimeout
+			if remindSec <= 0 {
+				remindSec = 60
+			}
+			if !reminded && p.delivery != nil && time.Until(o.ExpiresAt) <= time.Duration(remindSec)*time.Second {
 				reminded = true
 				_ = p.delivery.Deliver(ctx, &delivery.DeliverInput{Object: o, Options: &delivery.DeliverOptions{Summary: "【提醒】该请求即将超时，请尽快处理"}})
 			}

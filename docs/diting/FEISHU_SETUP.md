@@ -75,7 +75,7 @@
 ### 1. 编译新版本
 
 ```bash
-cd /home/dministrator/workspace/sentinel-ai/cmd/diting
+cd /home/dministrator/workspace/ziwei/diting/cmd/diting
 export PATH=$HOME/go/bin:$PATH
 go build -o diting main.go
 ```

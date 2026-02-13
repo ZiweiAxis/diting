@@ -12,7 +12,7 @@
 ## 2. 启动服务
 
 ```bash
-cd /home/dministrator/workspace/sentinel-ai/cmd/diting
+cd /home/dministrator/workspace/ziwei/diting/cmd/diting
 # 主流程与 main/main_feishu 均使用 config.yaml + .env，已移除 config.json
 go run ./cmd/diting_allinone/
 ```

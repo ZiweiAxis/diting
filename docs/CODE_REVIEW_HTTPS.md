@@ -251,7 +251,7 @@ if idx := strings.Index(hostLower, ":"); idx != -1 {
 运行编译测试脚本：
 
 ```bash
-cd /home/dministrator/workspace/sentinel-ai
+cd /home/dministrator/workspace/ziwei/diting
 ./scripts/compile-test.sh
 ```
 

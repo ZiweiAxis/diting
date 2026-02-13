@@ -9,7 +9,7 @@
 
 ### 1. 启动系统
 ```bash
-cd sentinel-ai
+cd diting
 ./start.bat  # Windows
 # 或
 ./start.sh   # Linux/Mac

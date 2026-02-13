@@ -6,7 +6,7 @@
 
 ```bash
 # 1. 复制项目到 WSL
-cd /mnt/e/workspace/sentinel-ai
+cd /mnt/e/workspace/ziwei/diting
 
 # 2. 使用 Podman 创建容器（类似 Docker）
 podman run -d --name sentinel-coredns \
@@ -39,7 +39,7 @@ podman run -d --name sentinel-api \
 # 1. 确保 Docker Desktop 的 WSL 2 集成已启用
 
 # 2. 在 WSL 中运行
-cd /mnt/e/workspace/sentinel-ai
+cd /mnt/e/workspace/ziwei/diting
 
 # 3. 启动服务
 docker-compose -f docker-compose-opensource.yml up -d

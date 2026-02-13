@@ -140,6 +140,21 @@ func applyEnvOverrides(c *Config) {
 			c.CHEQ.TimeoutSeconds = n
 		}
 	}
+	if v := os.Getenv("DITING_CHEQ_REMINDER_SECONDS_BEFORE_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.CHEQ.ReminderSecondsBeforeTimeout = n
+		}
+	}
+	if v := os.Getenv("DITING_FEISHU_RETRY_MAX_ATTEMPTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Delivery.Feishu.RetryMaxAttempts = n
+		}
+	}
+	if v := os.Getenv("DITING_FEISHU_RETRY_INITIAL_BACKOFF_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			c.Delivery.Feishu.RetryInitialBackoffSeconds = n
+		}
+	}
 	if c.LLM != nil {
 		if v := os.Getenv("DITING_LLM_BASE_URL"); v != "" {
 			c.LLM.BaseURL = v

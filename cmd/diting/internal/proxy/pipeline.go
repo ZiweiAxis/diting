@@ -33,13 +33,14 @@ func (w *responseWriterWithTraceID) WriteHeader(code int) {
 
 // pipeline 封装 L0 → PDP → allow/deny/review → 审计的流水线。
 type pipeline struct {
-	policy                 policy.Engine
-	cheq                   cheq.Engine
-	audit                  audit.Store
-	delivery               delivery.Provider
-	cheqTimeoutSec         int
-	reviewRequiresApproval bool
-	allowedAPIKeys         []string // 非空时启用 L0 校验：身份须在此列表中
+	policy                     policy.Engine
+	cheq                       cheq.Engine
+	audit                      audit.Store
+	delivery                   delivery.Provider
+	cheqTimeoutSec             int
+	reminderSecondsBeforeTimeout int // 超时前多少秒发飞书提醒；0 用默认 60
+	reviewRequiresApproval     bool
+	allowedAPIKeys             []string // 非空时启用 L0 校验：身份须在此列表中
 }
 
 func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *models.RequestContext, rp *httputil.ReverseProxy) {
@@ -128,7 +129,11 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 				finalStatus = string(o.Status)
 				break
 			}
-			if !reminded && p.delivery != nil && time.Until(o.ExpiresAt) <= 60*time.Second {
+			remindSec := p.reminderSecondsBeforeTimeout
+			if remindSec <= 0 {
+				remindSec = 60
+			}
+			if !reminded && p.delivery != nil && time.Until(o.ExpiresAt) <= time.Duration(remindSec)*time.Second {
 				reminded = true
 				_ = p.delivery.Deliver(ctx, &delivery.DeliverInput{Object: o, Options: &delivery.DeliverOptions{Summary: "【提醒】该请求即将超时，请尽快处理"}})
 			}

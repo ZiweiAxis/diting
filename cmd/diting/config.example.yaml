@@ -12,6 +12,8 @@ policy:
 
 cheq:
   timeout_seconds: 120
+  # 超时前多少秒发飞书提醒；0 或未配置表示 60 秒
+  reminder_seconds_before_timeout: 60
   persistence_path: "./data/cheq"
 
 delivery:
@@ -27,6 +29,9 @@ delivery:
     gateway_base_url: "http://localhost:8080"
     use_card_delivery: true
     use_long_connection: true
+    # 飞书发送失败时的重试：最大次数与首次退避秒数（之后指数增加）；0 表示默认 3 次、1 秒
+    retry_max_attempts: 3
+    retry_initial_backoff_seconds: 1
 
 audit:
   path: "./data/audit.jsonl"

@@ -27,9 +27,9 @@ go mod download
 
 echo ""
 echo "🔧 编译程序..."
-go build -o sentinel-ai main.go
+go build -o diting main.go
 
 echo ""
 echo "✅ 启动 Sentinel-AI 治理网关..."
 echo ""
-./sentinel-ai
+./diting

@@ -1,4 +1,4 @@
-# Development Guide (Sentinel-AI / Diting)
+# Development Guide (Diting)
 
 This document defines repository layout, recommended entry points, and code/commit conventions for collaboration and maintenance.
 
@@ -7,14 +7,12 @@ This document defines repository layout, recommended entry points, and code/comm
 ## 1. Repository structure
 
 ```
-sentinel-ai/
-├── cmd/diting/           # Diting governance gateway (main app)
-│   ├── main.go           # Recommended: Feishu approval (poll + chat_id fallback)
-│   ├── main_ollama.go    # Ollama-only, no Feishu
-│   ├── main_ws_fixed.go  # Feishu WebSocket (requires Feishu "long connection")
-│   ├── config.json       # Runtime config (do not commit secrets)
-│   ├── go.mod, go.sum
-│   ├── QUICKSTART.md     # Quick start (including recommended entry)
+diting/
+├── cmd/diting_allinone/  # 推荐主入口：All-in-One（策略/CHEQ/飞书/审计）
+│   └── main.go           # make build → bin/diting
+├── cmd/diting/           # 备用入口与文档（main.go、main_ollama.go 等）
+│   ├── config.yaml, go.mod, go.sum
+│   ├── QUICKSTART.md, ACCEPTANCE_CHECKLIST.md, MAIN_ENTRIES.md
 │   └── FEISHU_*.md       # Feishu integration and troubleshooting
 ├── pkg/                  # Reusable packages (dns, waf, etc.)
 ├── deployments/          # Docker / deployment configs
@@ -27,14 +25,15 @@ sentinel-ai/
 
 ## 2. Recommended entry points and build
 
-| Scenario              | Entry file        | Binary          | Notes |
-|-----------------------|-------------------|-----------------|-------|
-| Feishu approval       | `main.go`         | `diting`        | Poll for replies; chat_id fallback; no long connection |
-| WebSocket approval    | `main_ws_fixed.go`| `diting_ws_fixed` | Requires Feishu "long connection" |
-| No Feishu             | `main.go`         | `diting`        | Ollama intent analysis, local approval |
+| Scenario              | Entry file               | Binary   | Notes |
+|-----------------------|--------------------------|----------|-------|
+| **All-in-One（推荐）** | `cmd/diting_allinone/main.go` | `bin/diting` | 策略/CHEQ/飞书/审计一体；`make build` / `make run` |
+| Feishu（备用）        | `cmd/diting/main.go`     | `diting` | Poll + chat_id fallback；详见 MAIN_ENTRIES.md |
+| WebSocket（备用）     | `cmd/diting/main_ws_fixed.go` | `diting_ws_fixed` | 需飞书「长连接」 |
+| No Feishu（备用）     | `cmd/diting/main.go`     | `diting` | Ollama 意图分析，本地审批 |
 
-- Build: `go build -o diting main.go` (from `cmd/diting`). **All-in-One 推荐**：`go build -o bin/diting ./cmd/diting_allinone`；或仓库根目录 `make build`。
-- Config: see `cmd/diting/QUICKSTART.md` and `config.json` comments; keep secrets in env or local overrides; do not commit keys.
+- Build: **推荐主入口** 仓库根目录 `make build` 或 `go build -o bin/diting ./cmd/diting_allinone`（产出 `bin/diting`）；备用入口见 `cmd/diting/MAIN_ENTRIES.md`。
+- Config: see `cmd/diting/QUICKSTART.md` and `config.yaml` / `config.example.yaml`; keep secrets in env or local overrides; do not commit keys.
 - **Watch 模式（本地开发）**：修改代码或配置后自动重新编译并重启，无需每次手敲命令。安装 [air](https://github.com/air-verse/air)：`go install github.com/air-verse/air@latest`；在仓库根目录执行 `make watch`，或在 `cmd/diting` 下执行 `air`。配置见 `cmd/diting/.air.toml`。
 
 ---

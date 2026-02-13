@@ -46,8 +46,9 @@ type PolicyConfig struct {
 
 // CHEQConfig CHEQ 超时与持久化路径。
 type CHEQConfig struct {
-	TimeoutSeconds  int    `yaml:"timeout_seconds"`
-	PersistencePath string `yaml:"persistence_path"`
+	TimeoutSeconds            int    `yaml:"timeout_seconds"`
+	ReminderSecondsBeforeTimeout int `yaml:"reminder_seconds_before_timeout"` // 超时前多少秒发飞书提醒；0 表示默认 60
+	PersistencePath           string `yaml:"persistence_path"`
 }
 
 // DeliveryConfig 投递配置；敏感项从 env 覆盖（DITING_FEISHU_APP_SECRET 等）。
@@ -70,6 +71,9 @@ type FeishuConfig struct {
 	// 长连接 + 卡片：两种方式都支持。UseCardDelivery 为 true 时发交互卡片（批准/拒绝按钮）；UseLongConnection 为 true 时启动 WebSocket 接收事件（含卡片点击）。
 	UseCardDelivery   bool `yaml:"use_card_delivery"`   // 发审批为交互卡片（否则为文本+链接）
 	UseLongConnection bool `yaml:"use_long_connection"` // 使用长连接接收事件（含卡片交互），需在飞书后台选「长连接」订阅
+	// 飞书发送失败时的重试与退避（P1）
+	RetryMaxAttempts         int `yaml:"retry_max_attempts"`          // 最大重试次数；0 表示默认 3
+	RetryInitialBackoffSeconds int `yaml:"retry_initial_backoff_seconds"` // 首次退避秒数，之后指数增加；0 表示默认 1
 }
 
 // AuditConfig 审计写入路径与脱敏配置。

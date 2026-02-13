@@ -9,7 +9,7 @@
 ## 1. 构建镜像（约 2 分钟）
 
 ```bash
-# 在仓库根目录（sentinel-ai）
+# 在仓库根目录（diting）
 docker build -f deployments/docker/Dockerfile.diting -t diting:latest .
 ```
 

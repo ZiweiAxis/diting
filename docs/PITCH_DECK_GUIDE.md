@@ -468,7 +468,7 @@ CTO: [姓名]
 ### 环境准备
 ```bash
 # 启动服务
-cd sentinel-ai
+cd diting
 python sentinel.py
 
 # 在另一个终端

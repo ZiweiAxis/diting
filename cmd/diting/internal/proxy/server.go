@@ -44,7 +44,13 @@ func NewServer(
 		delivery:  delivery,
 		audit:     audit,
 		ownership: ownership,
-		pipeline:  &pipeline{policy: policy, cheq: cheq, audit: audit, delivery: delivery, cheqTimeoutSec: cfg.CHEQ.TimeoutSeconds, reviewRequiresApproval: reviewRequiresApproval, allowedAPIKeys: cfg.Proxy.AllowedAPIKeys},
+		pipeline: &pipeline{
+			policy: policy, cheq: cheq, audit: audit, delivery: delivery,
+			cheqTimeoutSec: cfg.CHEQ.TimeoutSeconds,
+			reminderSecondsBeforeTimeout: cfg.CHEQ.ReminderSecondsBeforeTimeout,
+			reviewRequiresApproval: reviewRequiresApproval,
+			allowedAPIKeys: cfg.Proxy.AllowedAPIKeys,
+		},
 	}
 }
 

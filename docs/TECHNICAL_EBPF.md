@@ -315,7 +315,7 @@ spec:
         operator: Exists
       containers:
       - name: sentinel
-        image: sentinel-ai/ebpf:latest
+        image: diting/ebpf:latest
         securityContext:
           privileged: true  # 特权模式
           capabilities:
@@ -382,7 +382,7 @@ ulimit -l  # 应该 >= 8388608
 whoami  # 应该是 root
 
 # 或配置 capabilities
-sudo setcap cap_sys_admin+ep /path/to/sentinel-ai
+sudo setcap cap_sys_admin+ep /path/to/diting
 ```
 
 **Q3: 性能问题**

@@ -48,7 +48,7 @@ services:
     build:
       context: ./sentinel-api
       dockerfile: Dockerfile
-    image: sentinel-ai-api:latest
+    image: diting-api:latest
     container_name: sentinel-api
     ports:
       - "8000:8000"

@@ -18,7 +18,7 @@
 ### 1. 释放 8080 并启动服务
 
 ```bash
-cd /home/dministrator/workspace/sentinel-ai/cmd/diting
+cd /home/dministrator/workspace/ziwei/diting/cmd/diting
 ./run_acceptance.sh start
 ```
 

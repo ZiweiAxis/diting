@@ -93,7 +93,15 @@ func (p *Provider) Deliver(ctx context.Context, in *delivery.DeliverInput) error
 		return err
 	}
 
-	for attempt := 0; attempt < 3; attempt++ {
+	maxAttempts := p.cfg.RetryMaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 3
+	}
+	initialBackoff := p.cfg.RetryInitialBackoffSeconds
+	if initialBackoff <= 0 {
+		initialBackoff = 1
+	}
+	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if p.cfg.UseCardDelivery {
 			err = p.sendCard(ctx, token, receiveIDType, receiveID, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
 		} else {
@@ -102,9 +110,9 @@ func (p *Provider) Deliver(ctx context.Context, in *delivery.DeliverInput) error
 		if err == nil {
 			break
 		}
-		if attempt < 2 {
-			backoff := time.Duration(1<<uint(attempt)) * time.Second
-			fmt.Fprintf(os.Stderr, "[diting] 飞书投递重试 %d/3  after %v: %v\n", attempt+1, backoff, err)
+		if attempt < maxAttempts-1 {
+			backoff := time.Duration(initialBackoff<<uint(attempt)) * time.Second
+			fmt.Fprintf(os.Stderr, "[diting] 飞书投递重试 %d/%d after %v: %v\n", attempt+1, maxAttempts, backoff, err)
 			time.Sleep(backoff)
 		}
 	}

@@ -17,7 +17,7 @@
 │  api.example.com → 10.0.1.1 (Nginx IP)            │
 │  db.example.com → 10.0.1.1                             │
 │                                                          │
-│  插件: sentinel-ai (自定义插件)                      │
+│  插件: diting (自定义插件)                      │
 └────────────────┬─────────────────────────────────────────┘
                  │
                  │ HTTP
@@ -31,7 +31,7 @@
 │      local httpc = http.new()                           │
 │      -- 调用 Sentinel-AI API 分析                      │
 │      local res, err = httpc:request_uri(             │
-│        "http://sentinel-ai:8000/analyze",            │
+│        "http://diting:8000/analyze",            │
 │        {                                              │
 │          method = "POST",                             │
 │          body = cjson.encode({                         │
@@ -136,7 +136,7 @@ http {
 
     # Sentinel-Ai API（业务逻辑）
     upstream sentinel_api {
-        server sentinel-ai:8000;
+        server diting:8000;
         keepalive 16;
     }
 
@@ -182,7 +182,7 @@ http {
                 -- 调用 Sentinel-AI API 分析
                 local httpc = http.new()
                 local res, err = httpc:request_uri(
-                    "http://sentinel-ai:8000/analyze",
+                    "http://diting:8000/analyze",
                     {
                         method = "POST",
                         body = cjson.encode({
@@ -629,7 +629,7 @@ async def handle_approval(approval: ApprovalRequest):
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "sentinel-ai-api"}
+    return {"status": "healthy", "service": "diting-api"}
 
 # ==================== 主程序 ====================
 if __name__ == "__main__":
@@ -720,7 +720,7 @@ networks:
 ### 步骤 1: 准备目录
 
 ```bash
-cd E:\workspace\sentinel-ai
+cd E:\workspace\ziwei\diting
 mkdir -p coredns nginx sentinel-api logs
 ```
 

@@ -484,6 +484,63 @@ func pollFeishuMessages(containerID string, since time.Time, acceptAnySender boo
 	return messages, nil
 }
 
+// isShortApprovalKeyword 判断消息是否为「仅短词」批准/拒绝（无 request ID）。
+// 用于 P1：用户仅回复「批准」「拒绝」等时自动匹配最近待审批。
+// 返回 (approved, true) 表示批准，(false, true) 表示拒绝，(_, false) 表示非短词。
+func isShortApprovalKeyword(msg string) (approved bool, ok bool) {
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return false, false
+	}
+	msgLower := strings.ToLower(msg)
+	approveWords := []string{"approve", "同意", "允许", "批准", "yes", "通过", "好"}
+	denyWords := []string{"deny", "拒绝", "禁止", "no", "不"}
+	for _, w := range approveWords {
+		if msgLower == w {
+			return true, true
+		}
+	}
+	for _, w := range denyWords {
+		if msgLower == w {
+			return false, true
+		}
+	}
+	// 极短消息且含关键词、且不含疑似 ID（数字/短横）时也视为短词
+	if len(msg) <= 10 {
+		for _, w := range approveWords {
+			if strings.Contains(msgLower, w) {
+				return true, true
+			}
+		}
+		for _, w := range denyWords {
+			if strings.Contains(msgLower, w) {
+				return false, true
+			}
+		}
+	}
+	return false, false
+}
+
+// getMostRecentRequestForContainer 返回指定轮询容器下 Timestamp 最近的一条待审批（用于短词自动匹配）。
+func getMostRecentRequestForContainer(container string) *ApprovalRequest {
+	approvalMutex.RLock()
+	defer approvalMutex.RUnlock()
+	var latest *ApprovalRequest
+	for _, r := range approvalRequests {
+		pollContainer := config.Feishu.ApprovalUserID
+		if r.ReplyChatID != "" {
+			pollContainer = r.ReplyChatID
+		}
+		if pollContainer != container {
+			continue
+		}
+		if latest == nil || r.Timestamp.After(latest.Timestamp) {
+			latest = r
+		}
+	}
+	return latest
+}
+
 func pollFeishuMessagesLoop() {
 	if !config.Feishu.UseMessageReply {
 		return
@@ -517,38 +574,57 @@ func pollFeishuMessagesLoop() {
 				continue
 			}
 
-			// Check for approval/denial keywords
+			// Check for approval/denial keywords (P1: 短词可自动匹配最近待审批)
 			for _, msg := range messages {
 				msgLower := strings.ToLower(msg)
-				if strings.Contains(msgLower, req.ID[:8]) {
-					var approved bool
-					var reason string
+				var approved bool
+				var reason string
+				var matched bool
 
-					if strings.Contains(msgLower, "approve") || strings.Contains(msgLower, "同意") || 
-					   strings.Contains(msgLower, "允许") || strings.Contains(msgLower, "yes") {
+				// 1) 短词匹配：仅「批准」「拒绝」等，匹配当前容器下最近一条待审批
+				if approvedShort, okShort := isShortApprovalKeyword(msg); okShort {
+					latest := getMostRecentRequestForContainer(pollContainer)
+					if latest != nil && latest.ID == req.ID {
+						approved = approvedShort
+						if approved {
+							reason = "Approved by user via Feishu (short keyword, latest request)"
+						} else {
+							reason = "Denied by user via Feishu (short keyword, latest request)"
+						}
+						matched = true
+					}
+				}
+				// 2) 原有逻辑：消息中含 request ID 前缀 + 批准/拒绝关键词
+				if !matched && len(req.ID) >= 8 && strings.Contains(msgLower, req.ID[:8]) {
+					if strings.Contains(msgLower, "approve") || strings.Contains(msgLower, "同意") ||
+						strings.Contains(msgLower, "允许") || strings.Contains(msgLower, "yes") {
 						approved = true
 						reason = "Approved by user via Feishu message"
-					} else if strings.Contains(msgLower, "deny") || strings.Contains(msgLower, "拒绝") || 
-					          strings.Contains(msgLower, "禁止") || strings.Contains(msgLower, "no") {
+						matched = true
+					} else if strings.Contains(msgLower, "deny") || strings.Contains(msgLower, "拒绝") ||
+						strings.Contains(msgLower, "禁止") || strings.Contains(msgLower, "no") {
 						approved = false
 						reason = "Denied by user via Feishu message"
-					} else {
-						continue
+						matched = true
 					}
-
-					// Send response
-					select {
-					case req.ResponseCh <- ApprovalResponse{Approved: approved, Reason: reason}:
-						log.Printf("Approval response sent for request %s: approved=%v", req.ID, approved)
-					default:
-					}
-
-					// Remove from pending requests
-					approvalMutex.Lock()
-					delete(approvalRequests, req.ID)
-					approvalMutex.Unlock()
-					break
 				}
+
+				if !matched {
+					continue
+				}
+
+				// Send response
+				select {
+				case req.ResponseCh <- ApprovalResponse{Approved: approved, Reason: reason}:
+					log.Printf("Approval response sent for request %s: approved=%v", req.ID, approved)
+				default:
+				}
+
+				// Remove from pending requests
+				approvalMutex.Lock()
+				delete(approvalRequests, req.ID)
+				approvalMutex.Unlock()
+				break
 			}
 		}
 	}
@@ -652,7 +728,7 @@ func sendApprovalRequest(req *ApprovalRequest) error {
 		msg.WriteString(fmt.Sprintf("建议: %s\n", req.Intent.Recommended))
 	}
 	
-	msg.WriteString(fmt.Sprintf("\n请回复: approve %s 或 deny %s", req.ID[:8], req.ID[:8]))
+	msg.WriteString(fmt.Sprintf("\n请回复: approve %s 或 deny %s；或仅回复「批准」「拒绝」匹配最近一条", req.ID[:8], req.ID[:8]))
 
 	msgStr := msg.String()
 	// 先尝试发到 approval_user_id

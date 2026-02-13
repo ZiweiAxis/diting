@@ -10,7 +10,7 @@
 
 **Status:** MVP / concept validation — suitable for trial and feedback; not yet production-ready.
 
-[中文文档](README_CN.md) | [Quick Start](#-quick-start) | [Security](SECURITY.md)
+[中文文档](README_CN.md) | [Quick Start](#-quick-start) | [接入与验收](#-接入与验收) | [Security](SECURITY.md)
 
 ---
 
@@ -96,30 +96,31 @@ More: [3AF — product philosophy & dimensions](docs/diting/3AF_OVERVIEW.md)（[
 
 ### Installation
 
+**推荐入口**：主程序为 **All-in-One** `cmd/diting_allinone`，产出 `bin/diting`。以下示例均以仓库根为工作目录。
+
 #### Option 1: Run from Source
 
 ```bash
 # Clone the repository
 git clone https://github.com/hulk-yin/diting.git
-cd diting/cmd/diting
+cd diting
 
-# Download dependencies
-go mod download
-
-# Run the service
-go run main.go
+# 推荐：使用 All-in-One 入口
+go run ./cmd/diting_allinone
+# 或 make run
 ```
 
 #### Option 2: Build Binary
 
 ```bash
-cd diting/cmd/diting
+cd diting
 
-# Build
-go build -o diting main.go
+# Build（推荐）
+make build
+# 或：go build -o bin/diting ./cmd/diting_allinone
 
 # Run
-./diting
+./bin/diting
 ```
 
 #### Option 2b: Feishu approval (recommended for human-in-the-loop)
@@ -127,17 +128,13 @@ go build -o diting main.go
 For high-risk operations with Feishu approval (no public URL or Feishu "long connection" required):
 
 ```bash
-cd diting/cmd/diting
-
-# Build Feishu message-reply version
-go build -o diting main.go
-
-# Configure config.json (feishu.approval_user_id, use_message_reply: true, poll_interval_seconds)
-# Then run
-./diting
+cd diting
+make build
+# 配置 config.yaml（feishu、CHEQ 等），见 cmd/diting/CONFIG_LAYERS.md
+./bin/diting
 ```
 
-See **[cmd/diting/QUICKSTART.md](cmd/diting/QUICKSTART.md)** for config and minimal verification steps.
+See **[docs/diting/QUICKSTART.md](docs/diting/QUICKSTART.md)** for config and minimal verification steps. Legacy entries under `cmd/diting/` (e.g. main.go) see [cmd/diting/MAIN_ENTRIES.md](cmd/diting/MAIN_ENTRIES.md).
 
 #### Option 3: Docker Deployment
 
@@ -162,6 +159,13 @@ curl -X DELETE http://localhost:8080/delete
 # View audit logs
 cat logs/audit.jsonl
 ```
+
+---
+
+## 📋 接入与验收
+
+- **接入检查清单**与**验证流量经 Diting**：见 [QUICKSTART - 接入检查清单与验证流量经 Diting](docs/diting/QUICKSTART.md#接入检查清单与验证流量经-diting)（Proxy/DNS 配置与 curl/审计验证步骤）。
+- **闭环验收检查单**（策略 → 飞书卡片 → 放行/拒绝）：见 [cmd/diting/ACCEPTANCE_CHECKLIST.md](cmd/diting/ACCEPTANCE_CHECKLIST.md)。
 
 ---
 
