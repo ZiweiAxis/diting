@@ -30,6 +30,7 @@ type Server struct {
 }
 
 // NewServer 构造 Server；各组件由调用方注入。reviewRequiresApproval 为 true 时 review 路径轮询等待确认，否则立即放行（占位行为）。
+// approvalMatcher 为 I-009 按 path/risk 匹配超时与审批人；nil 则使用全局 CHEQ/Feishu 配置。
 func NewServer(
 	cfg *config.Config,
 	policy policy.Engine,
@@ -38,6 +39,7 @@ func NewServer(
 	audit audit.Store,
 	ownership ownership.Resolver,
 	reviewRequiresApproval bool,
+	approvalMatcher *ownership.RuleMatcher,
 ) *Server {
 	return &Server{
 		cfg:       cfg,
@@ -47,11 +49,15 @@ func NewServer(
 		audit:     audit,
 		ownership: ownership,
 		pipeline: &pipeline{
-			policy: policy, cheq: cheq, audit: audit, delivery: delivery,
-			cheqTimeoutSec: cfg.CHEQ.TimeoutSeconds,
+			policy:                       policy,
+			cheq:                         cheq,
+			audit:                        audit,
+			delivery:                     delivery,
+			cheqTimeoutSec:               cfg.CHEQ.TimeoutSeconds,
 			reminderSecondsBeforeTimeout: cfg.CHEQ.ReminderSecondsBeforeTimeout,
-			reviewRequiresApproval: reviewRequiresApproval,
-			allowedAPIKeys: cfg.Proxy.AllowedAPIKeys,
+			reviewRequiresApproval:       reviewRequiresApproval,
+			allowedAPIKeys:               cfg.Proxy.AllowedAPIKeys,
+			approvalMatcher:              approvalMatcher,
 		},
 	}
 }

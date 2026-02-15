@@ -36,7 +36,7 @@ func TestProxyHandler_DirectorPreservesUpstreamAndInjectsTraceHeaders(t *testing
 		},
 	}
 
-	s := NewServer(cfg, &policy.StubEngine{}, cheq.NewStubEngine(), &delivery.StubProvider{}, audit.NewStubStore(), &ownership.StubResolver{}, false)
+	s := NewServer(cfg, &policy.StubEngine{}, cheq.NewStubEngine(), &delivery.StubProvider{}, audit.NewStubStore(), &ownership.StubResolver{}, false, nil)
 	h := s.proxyHandler()
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/foo", nil)

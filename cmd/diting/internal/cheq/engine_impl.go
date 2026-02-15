@@ -55,17 +55,24 @@ func (e *EngineImpl) Create(ctx context.Context, in *CreateInput) (*models.Confi
 			confirmerIDs = ids
 		}
 	}
+	policy := e.approvalPolicy
+	if in.ApprovalPolicy == "all" {
+		policy = "all"
+	} else if in.ApprovalPolicy != "" {
+		policy = "any"
+	}
 	obj := &models.ConfirmationObject{
-		ID:           id,
-		TraceID:      in.TraceID,
-		Status:       models.ConfirmationStatusPending,
-		CreatedAt:     time.Now(),
-		ExpiresAt:    expiresAt,
-		Resource:     in.Resource,
-		Action:       in.Action,
-		Summary:      in.Summary,
-		ConfirmerIDs: confirmerIDs,
-		Type:         in.Type,
+		ID:              id,
+		TraceID:         in.TraceID,
+		Status:          models.ConfirmationStatusPending,
+		CreatedAt:       time.Now(),
+		ExpiresAt:       expiresAt,
+		Resource:        in.Resource,
+		Action:          in.Action,
+		Summary:         in.Summary,
+		ConfirmerIDs:    confirmerIDs,
+		Type:            in.Type,
+		ApprovalPolicy:  policy,
 	}
 	if err := e.store.Put(ctx, obj); err != nil {
 		return nil, err
@@ -114,7 +121,11 @@ func (e *EngineImpl) Submit(ctx context.Context, id string, approved bool, confi
 		return e.store.Put(ctx, obj)
 	}
 	// approved == true
-	if e.approvalPolicy == "all" {
+	policy := obj.ApprovalPolicy
+	if policy == "" {
+		policy = e.approvalPolicy
+	}
+	if policy == "all" {
 		if obj.ApprovedBy == nil {
 			obj.ApprovedBy = []string{}
 		}

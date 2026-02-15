@@ -22,16 +22,17 @@ func NewStubEngine() *StubEngine {
 func (s *StubEngine) Create(ctx context.Context, in *CreateInput) (*models.ConfirmationObject, error) {
 	id := uuid.New().String()
 	obj := &models.ConfirmationObject{
-		ID:            id,
-		TraceID:       in.TraceID,
-		Status:        models.ConfirmationStatusPending,
-		CreatedAt:     time.Now(),
-		ExpiresAt:     in.ExpiresAt,
-		Resource:      in.Resource,
-		Action:        in.Action,
-		Summary:       in.Summary,
-		ConfirmerIDs:  in.ConfirmerIDs,
-		Type:          in.Type,
+		ID:              id,
+		TraceID:         in.TraceID,
+		Status:          models.ConfirmationStatusPending,
+		CreatedAt:       time.Now(),
+		ExpiresAt:       in.ExpiresAt,
+		Resource:        in.Resource,
+		Action:          in.Action,
+		Summary:         in.Summary,
+		ConfirmerIDs:    in.ConfirmerIDs,
+		Type:            in.Type,
+		ApprovalPolicy:  in.ApprovalPolicy,
 	}
 	s.mu.Lock()
 	s.objs[id] = obj

@@ -15,6 +15,7 @@ type CreateInput struct {
 	ExpiresAt     time.Time
 	ConfirmerIDs  []string
 	Type          string
+	ApprovalPolicy string // I-009：本请求的审批策略（any/all）；空则用引擎默认
 }
 
 // ErrAlreadyProcessed 表示该 ConfirmationObject 已处理（幂等提交时返回）。

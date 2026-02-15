@@ -57,9 +57,19 @@ type PolicyConfig struct {
 
 // CHEQConfig CHEQ 超时与持久化路径。
 type CHEQConfig struct {
-	TimeoutSeconds            int    `yaml:"timeout_seconds"`
-	ReminderSecondsBeforeTimeout int `yaml:"reminder_seconds_before_timeout"` // 超时前多少秒发飞书提醒；0 表示默认 60
-	PersistencePath           string `yaml:"persistence_path"`
+	TimeoutSeconds              int             `yaml:"timeout_seconds"`
+	ReminderSecondsBeforeTimeout int             `yaml:"reminder_seconds_before_timeout"` // 超时前多少秒发飞书提醒；0 表示默认 60
+	PersistencePath             string          `yaml:"persistence_path"`
+	ApprovalRules               []ApprovalRule  `yaml:"approval_rules,omitempty"` // I-009：按 path/risk_level 匹配不同超时与审批人；先匹配先生效
+}
+
+// ApprovalRule I-009：单条审批规则，按 path 前缀或 risk_level 匹配，覆盖超时与审批人。
+type ApprovalRule struct {
+	PathPrefix       string   `yaml:"path_prefix,omitempty"`   // 资源路径前缀匹配（如 /admin、/api）
+	RiskLevel        string   `yaml:"risk_level,omitempty"`    // 风险等级精确匹配（如 high、medium、low）；可选
+	TimeoutSeconds   int      `yaml:"timeout_seconds"`         // 本规则超时秒数；0 表示用全局 CHEQ.timeout_seconds
+	ApprovalUserIDs  []string `yaml:"approval_user_ids,omitempty"` // 本规则审批人列表；空表示用 delivery.feishu 默认
+	ApprovalPolicy   string   `yaml:"approval_policy,omitempty"`   // any 或 all；空表示用 delivery.feishu 默认
 }
 
 // DeliveryConfig 投递配置；敏感项从 env 覆盖（DITING_FEISHU_APP_SECRET 等）。

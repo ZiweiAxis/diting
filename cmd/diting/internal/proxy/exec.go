@@ -64,6 +64,24 @@ func (p *pipeline) ExecEvaluate(ctx context.Context, traceID string, req *models
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
+	resource := req.Resource
+	if resource == "" {
+		resource = req.TargetURL
+	}
+	riskLevel := ""
+	if req.Context != nil {
+		riskLevel = req.Context["risk_level"]
+	}
+	var confirmerIDs []string
+	approvalPolicy := ""
+	if p.approvalMatcher != nil {
+		m := p.approvalMatcher.Match(resource, riskLevel)
+		if m.TimeoutSeconds > 0 {
+			timeoutSec = m.TimeoutSeconds
+		}
+		confirmerIDs = m.ApprovalUserIDs
+		approvalPolicy = m.ApprovalPolicy
+	}
 
 	switch {
 	case decision.Allow():
@@ -87,12 +105,14 @@ func (p *pipeline) ExecEvaluate(ctx context.Context, traceID string, req *models
 			summary = req.Action + " " + req.Resource
 		}
 		in := &cheq.CreateInput{
-			TraceID:   traceID,
-			Resource:  req.Resource,
-			Action:    req.Action,
-			Summary:   summary,
-			ExpiresAt: expiresAt,
-			Type:      "operation_approval",
+			TraceID:        traceID,
+			Resource:      resource,
+			Action:        req.Action,
+			Summary:       summary,
+			ExpiresAt:     expiresAt,
+			ConfirmerIDs:  confirmerIDs,
+			Type:          "operation_approval",
+			ApprovalPolicy: approvalPolicy,
 		}
 		obj, err := p.cheq.Create(ctx, in)
 		if err != nil {
@@ -202,6 +222,24 @@ func (p *pipeline) ExecEvaluateNonBlocking(ctx context.Context, traceID string, 
 	if timeoutSec <= 0 {
 		timeoutSec = 300
 	}
+	nbResource := req.Resource
+	if nbResource == "" {
+		nbResource = req.TargetURL
+	}
+	nbRiskLevel := ""
+	if req.Context != nil {
+		nbRiskLevel = req.Context["risk_level"]
+	}
+	var nbConfirmerIDs []string
+	nbApprovalPolicy := ""
+	if p.approvalMatcher != nil {
+		m := p.approvalMatcher.Match(nbResource, nbRiskLevel)
+		if m.TimeoutSeconds > 0 {
+			timeoutSec = m.TimeoutSeconds
+		}
+		nbConfirmerIDs = m.ApprovalUserIDs
+		nbApprovalPolicy = m.ApprovalPolicy
+	}
 	switch {
 	case decision.Allow():
 		p.appendEvidence(ctx, traceID, req, "allow", decision.PolicyRuleID, decision.DecisionReason)
@@ -216,8 +254,14 @@ func (p *pipeline) ExecEvaluateNonBlocking(ctx context.Context, traceID string, 
 			summary = req.Action + " " + req.Resource
 		}
 		in := &cheq.CreateInput{
-			TraceID: traceID, Resource: req.Resource, Action: req.Action, Summary: summary,
-			ExpiresAt: expiresAt, Type: "operation_approval",
+			TraceID:        traceID,
+			Resource:       nbResource,
+			Action:         req.Action,
+			Summary:        summary,
+			ExpiresAt:      expiresAt,
+			ConfirmerIDs:   nbConfirmerIDs,
+			Type:           "operation_approval",
+			ApprovalPolicy: nbApprovalPolicy,
 		}
 		obj, err := p.cheq.Create(ctx, in)
 		if err != nil {

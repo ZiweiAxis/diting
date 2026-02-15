@@ -13,6 +13,7 @@ import (
 	"diting/internal/cheq"
 	"diting/internal/delivery"
 	"diting/internal/models"
+	"diting/internal/ownership"
 	"diting/internal/policy"
 )
 
@@ -33,14 +34,15 @@ func (w *responseWriterWithTraceID) WriteHeader(code int) {
 
 // pipeline 封装 L0 → PDP → allow/deny/review → 审计的流水线。
 type pipeline struct {
-	policy                     policy.Engine
-	cheq                       cheq.Engine
-	audit                      audit.Store
-	delivery                   delivery.Provider
-	cheqTimeoutSec             int
+	policy                       policy.Engine
+	cheq                         cheq.Engine
+	audit                        audit.Store
+	delivery                     delivery.Provider
+	cheqTimeoutSec               int
 	reminderSecondsBeforeTimeout int // 超时前多少秒发飞书提醒；0 用默认 60
-	reviewRequiresApproval     bool
-	allowedAPIKeys             []string // 非空时启用 L0 校验：身份须在此列表中
+	reviewRequiresApproval       bool
+	allowedAPIKeys               []string // 非空时启用 L0 校验：身份须在此列表中
+	approvalMatcher              *ownership.RuleMatcher // I-009：按 path/risk 匹配超时与审批人；nil 则用全局配置
 }
 
 func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *models.RequestContext, rp *httputil.ReverseProxy) {
@@ -93,14 +95,34 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 		if timeoutSec <= 0 {
 			timeoutSec = 300
 		}
+		resource := reqCtx.Resource
+		if resource == "" {
+			resource = reqCtx.TargetURL
+		}
+		riskLevel := ""
+		if reqCtx.Context != nil {
+			riskLevel = reqCtx.Context["risk_level"]
+		}
+		var confirmerIDs []string
+		approvalPolicy := ""
+		if p.approvalMatcher != nil {
+			m := p.approvalMatcher.Match(resource, riskLevel)
+			if m.TimeoutSeconds > 0 {
+				timeoutSec = m.TimeoutSeconds
+			}
+			confirmerIDs = m.ApprovalUserIDs
+			approvalPolicy = m.ApprovalPolicy
+		}
 		expiresAt := time.Now().Add(time.Duration(timeoutSec) * time.Second)
 		in := &cheq.CreateInput{
-			TraceID:   traceID,
-			Resource:  reqCtx.Resource,
-			Action:    reqCtx.Action,
-			Summary:   reqCtx.TargetURL,
-			ExpiresAt: expiresAt,
-			Type:      "operation_approval",
+			TraceID:        traceID,
+			Resource:      resource,
+			Action:        reqCtx.Action,
+			Summary:       reqCtx.TargetURL,
+			ExpiresAt:     expiresAt,
+			ConfirmerIDs:  confirmerIDs,
+			Type:          "operation_approval",
+			ApprovalPolicy: approvalPolicy,
 		}
 		obj, err := p.cheq.Create(ctx, in)
 		if err != nil {
@@ -139,19 +161,19 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 			}
 			time.Sleep(2 * time.Second)
 		}
-		var confirmerIDs []string
+		var evidenceConfirmerIDs []string
 		if o != nil {
-			confirmerIDs = o.ConfirmerIDs
+			evidenceConfirmerIDs = o.ConfirmerIDs
 		}
 		if finalStatus == string(models.ConfirmationStatusApproved) {
 			rp.ServeHTTP(wrap, r)
-			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason, finalStatus, confirmerIDs)
+			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason, finalStatus, evidenceConfirmerIDs)
 		} else {
 			wrap.WriteHeader(http.StatusForbidden)
 			if finalStatus == "" {
 				finalStatus = "expired"
 			}
-			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, finalStatus, decision.PolicyRuleID, decision.DecisionReason, finalStatus, confirmerIDs)
+			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, finalStatus, decision.PolicyRuleID, decision.DecisionReason, finalStatus, evidenceConfirmerIDs)
 			_, _ = wrap.Write([]byte("confirmation " + finalStatus))
 		}
 	default:

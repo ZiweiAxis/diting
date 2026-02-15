@@ -37,7 +37,7 @@
 | ID | 标题 | 优先级 | 说明 | 状态 |
 |----|------|--------|------|------|
 | I-008 | 多审批人配置与策略（多 approval_user_id，任一/全部通过） | P2 | config 支持多个审批人，投递时群发或按策略选人；规则可为「任一通过即放行」或「全部通过」。 | **Done**（2026-02-15：approval_user_ids、approval_policy、ownership 默认列表、飞书群发、Submit(by)、ApprovedBy） |
-| I-009 | 按风险等级或 path 配置不同超时与审批人 | P2 | 不同风险或 path 可配置不同超时时间、不同审批人列表。 | Open |
+| I-009 | 按风险等级或 path 配置不同超时与审批人 | P2 | 不同风险或 path 可配置不同超时时间、不同审批人列表。 | **Done**（2026-02-15：approval_rules、RuleMatcher、CreateInput/Object ApprovalPolicy、pipeline/exec 按规则设超时与审批人） |
 
 ---
 

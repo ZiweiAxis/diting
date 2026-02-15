@@ -24,9 +24,10 @@ type ConfirmationObject struct {
 	Resource      string
 	Action        string
 	Summary       string   // 操作摘要，供确认人查看。
-	ConfirmerIDs  []string // 确认人标识列表（如飞书 user_id）。
-	Type          string   // 如 agent_onboarding / service_access / operation_approval。
-	ApprovedBy    []string // I-008「全部通过」时已批准的 confirmer_id 列表；nil 表示未使用
+	ConfirmerIDs   []string // 确认人标识列表（如飞书 user_id）。
+	Type           string   // 如 agent_onboarding / service_access / operation_approval。
+	ApprovedBy     []string // I-008「全部通过」时已批准的 confirmer_id 列表；nil 表示未使用
+	ApprovalPolicy string   // I-009：本对象的审批策略（any/all）；空则用引擎默认
 }
 
 // IsTerminal 返回是否已终态（不再接受 Submit）。

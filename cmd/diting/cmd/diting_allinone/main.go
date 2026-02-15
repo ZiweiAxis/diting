@@ -157,7 +157,45 @@ func main() {
 		}
 	}
 	reviewRequiresApproval := cfg.CHEQ.PersistencePath != "" // 使用持久化 CHEQ 时轮询等待确认
-	srv := proxy.NewServer(cfg, policyEngine, cheqEngine, deliveryProvider, auditStore, ownershipResolver, reviewRequiresApproval)
+	var approvalMatcher *ownership.RuleMatcher
+	if len(cfg.CHEQ.ApprovalRules) > 0 {
+		rules := make([]struct {
+			PathPrefix      string
+			RiskLevel       string
+			TimeoutSeconds  int
+			ApprovalUserIDs []string
+			ApprovalPolicy  string
+		}, len(cfg.CHEQ.ApprovalRules))
+		for i, r := range cfg.CHEQ.ApprovalRules {
+			rules[i] = struct {
+				PathPrefix      string
+				RiskLevel       string
+				TimeoutSeconds  int
+				ApprovalUserIDs []string
+				ApprovalPolicy  string
+			}{
+				PathPrefix:      r.PathPrefix,
+				RiskLevel:       r.RiskLevel,
+				TimeoutSeconds:  r.TimeoutSeconds,
+				ApprovalUserIDs: append([]string(nil), r.ApprovalUserIDs...),
+				ApprovalPolicy:  r.ApprovalPolicy,
+			}
+		}
+		defTimeout := cfg.CHEQ.TimeoutSeconds
+		if defTimeout <= 0 {
+			defTimeout = 300
+		}
+		defPolicy := cfg.Delivery.Feishu.ApprovalPolicy
+		if defPolicy != "all" {
+			defPolicy = "any"
+		}
+		approvalMatcher = ownership.NewRuleMatcher(rules, ownership.ApprovalRuleMatch{
+			TimeoutSeconds:  defTimeout,
+			ApprovalUserIDs: append([]string(nil), cfg.Delivery.Feishu.ApprovalUserIDs...),
+			ApprovalPolicy:  defPolicy,
+		})
+	}
+	srv := proxy.NewServer(cfg, policyEngine, cheqEngine, deliveryProvider, auditStore, ownershipResolver, reviewRequiresApproval, approvalMatcher)
 	if cfg.Chain.Enabled {
 		srv.SetChainHandler(chainSrv.Handler())
 		fmt.Fprintf(os.Stderr, "[diting] 链子模块已启用，/chain/did/*、/chain/audit/*、/chain/health 可用\n")

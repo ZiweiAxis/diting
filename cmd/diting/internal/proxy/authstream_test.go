@@ -20,7 +20,7 @@ func TestAuthStream_InitAndAuthAllow(t *testing.T) {
 	cfg.Proxy.Upstream = "http://localhost:9999"
 	cfg.Proxy.AllowedAPIKeys = nil
 	cfg.CHEQ.TimeoutSeconds = 60
-	srv := NewServer(cfg, &policy.StubEngine{}, cheq.NewStubEngine(), &delivery.StubProvider{}, audit.NewStubStore(), &ownership.StubResolver{}, false)
+	srv := NewServer(cfg, &policy.StubEngine{}, cheq.NewStubEngine(), &delivery.StubProvider{}, audit.NewStubStore(), &ownership.StubResolver{}, false, nil)
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
