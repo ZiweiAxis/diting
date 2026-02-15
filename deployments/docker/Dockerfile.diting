@@ -3,6 +3,9 @@
 
 FROM golang:1.21-alpine AS builder
 WORKDIR /build
+# 构建时拉模块：默认用国内代理，可 --build-arg GOPROXY= 覆盖
+ARG GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
 COPY cmd/diting/go.mod cmd/diting/go.sum ./
 RUN go mod download
 COPY cmd/diting/ ./
