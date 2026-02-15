@@ -98,7 +98,7 @@ func main() {
 	var deliveryProvider delivery.Provider
 	if cfg.Delivery.Feishu.Enabled && cfg.Delivery.Feishu.AppID != "" && cfg.Delivery.Feishu.AppSecret != "" {
 		deliveryProvider = feishudelivery.NewProvider(cfg.Delivery.Feishu)
-		if cfg.Delivery.Feishu.ApprovalUserID != "" || cfg.Delivery.Feishu.ChatID != "" {
+		if len(cfg.Delivery.Feishu.ApprovalUserIDs) > 0 || cfg.Delivery.Feishu.ApprovalUserID != "" || cfg.Delivery.Feishu.ChatID != "" {
 			fmt.Fprintf(os.Stderr, "[diting] 飞书投递已启用，审批人将收到待确认消息\n")
 		} else {
 			fmt.Fprintf(os.Stderr, "[diting] 飞书投递已启用，但未配置 approval_user_id/chat_id，请设置 DITING_FEISHU_APPROVAL_USER_ID 或 static_map 以收到消息\n")
@@ -110,18 +110,16 @@ func main() {
 		}
 	}
 	var ownershipResolver ownership.Resolver
-	if len(cfg.Ownership.StaticMap) > 0 {
-		ownershipResolver = ownership.NewStaticResolver(cfg.Ownership.StaticMap)
-	} else {
-		ownershipResolver = &ownership.StubResolver{}
-	}
+	// I-008: 支持多审批人默认列表；无 static_map 时也用 defaultIDs
+	defaultApprovalIDs := cfg.Delivery.Feishu.ApprovalUserIDs
+	ownershipResolver = ownership.NewStaticResolver(cfg.Ownership.StaticMap, defaultApprovalIDs)
 	if cfg.CHEQ.PersistencePath != "" {
 		store, err := cheq.NewJSONStore(cfg.CHEQ.PersistencePath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cheq store: %v\n", err)
 			os.Exit(1)
 		}
-		cheqEngine = cheq.NewEngineImpl(store, cfg.CHEQ.TimeoutSeconds, ownershipResolver, deliveryProvider)
+		cheqEngine = cheq.NewEngineImpl(store, cfg.CHEQ.TimeoutSeconds, ownershipResolver, deliveryProvider, cfg.Delivery.Feishu.ApprovalPolicy)
 	} else {
 		cheqEngine = cheq.NewStubEngine()
 	}
@@ -189,7 +187,7 @@ func main() {
 	}
 	if cfg.Delivery.Feishu.Enabled && cfg.Delivery.Feishu.UseLongConnection {
 		feishudelivery.RunLongConnection(ctx, cfg.Delivery.Feishu, func(cheqID string, approved bool) error {
-			return cheqEngine.Submit(context.Background(), cheqID, approved)
+			return cheqEngine.Submit(context.Background(), cheqID, approved, "")
 		})
 		fmt.Fprintf(os.Stderr, "[diting] 飞书长连接已启动（卡片交互事件将在此处理）\n")
 	}

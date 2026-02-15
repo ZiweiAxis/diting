@@ -15,5 +15,6 @@ type Engine interface {
 	// GetByID 根据 id 查询当前状态；若已过期则 Status 为 expired。
 	GetByID(ctx context.Context, id string) (*models.ConfirmationObject, error)
 	// Submit 幂等提交确认结果；已处理或已过期返回 ErrAlreadyProcessed/ErrExpired。
-	Submit(ctx context.Context, id string, approved bool) error
+	// confirmerID 用于 I-008「全部通过」时记录谁批准；为空时按「任一通过」处理。
+	Submit(ctx context.Context, id string, approved bool, confirmerID string) error
 }

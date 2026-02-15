@@ -103,6 +103,13 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("config unmarshal: %w", err)
 	}
 	applyEnvOverrides(&c)
+	// 多审批人兼容：无 approval_user_ids 时用 approval_user_id 作为单元素
+	if len(c.Delivery.Feishu.ApprovalUserIDs) == 0 && c.Delivery.Feishu.ApprovalUserID != "" {
+		c.Delivery.Feishu.ApprovalUserIDs = []string{c.Delivery.Feishu.ApprovalUserID}
+	}
+	if c.Delivery.Feishu.ApprovalPolicy != "all" {
+		c.Delivery.Feishu.ApprovalPolicy = "any"
+	}
 	return &c, nil
 }
 
@@ -116,6 +123,9 @@ func applyEnvOverrides(c *Config) {
 	}
 	if v := os.Getenv("DITING_FEISHU_APPROVAL_USER_ID"); v != "" {
 		c.Delivery.Feishu.ApprovalUserID = v
+		if len(c.Delivery.Feishu.ApprovalUserIDs) == 0 {
+			c.Delivery.Feishu.ApprovalUserIDs = []string{v}
+		}
 	}
 	if v := os.Getenv("DITING_FEISHU_CHAT_ID"); v != "" {
 		c.Delivery.Feishu.ChatID = v

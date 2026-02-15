@@ -52,7 +52,7 @@ func (s *StubEngine) GetByID(ctx context.Context, id string) (*models.Confirmati
 	return obj, nil
 }
 
-func (s *StubEngine) Submit(ctx context.Context, id string, approved bool) error {
+func (s *StubEngine) Submit(ctx context.Context, id string, approved bool, confirmerID string) error {
 	s.mu.Lock()
 	obj := s.objs[id]
 	if obj == nil {

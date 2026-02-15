@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -57,40 +58,36 @@ func (p *Provider) Deliver(ctx context.Context, in *delivery.DeliverInput) error
 	if summary == "" {
 		summary = in.Object.Resource + " " + in.Object.Action
 	}
-	baseURL := p.cfg.GatewayBaseURL
+	baseURL := strings.TrimSuffix(p.cfg.GatewayBaseURL, "/")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080"
 	}
-	approveURL := fmt.Sprintf("%s/cheq/approve?id=%s&approved=true", strings.TrimSuffix(baseURL, "/"), in.Object.ID)
-	rejectURL := fmt.Sprintf("%s/cheq/approve?id=%s&approved=false", strings.TrimSuffix(baseURL, "/"), in.Object.ID)
-	body := fmt.Sprintf("待确认请求\nTraceID: %s\nID: %s\n摘要: %s\n\n批准（点击或复制链接）: %s\n拒绝: %s",
-		in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
-
-	// 与 main.go 一致：默认按 user_id 发（避免 open_id cross app）；仅当以 ou_ 开头时用 open_id
 	receiveIDType := "user_id"
-	receiveID := p.cfg.ApprovalUserID
-	if receiveID != "" && strings.HasPrefix(receiveID, "ou_") {
-		receiveIDType = "open_id"
-	}
-	if receiveID == "" && p.cfg.ChatID != "" {
-		receiveIDType = "chat_id"
-		receiveID = p.cfg.ChatID
-	}
-	if receiveID == "" && in.Options != nil && len(in.Options.ConfirmerIDs) > 0 {
-		receiveID = in.Options.ConfirmerIDs[0]
-		if strings.HasPrefix(receiveID, "ou_") {
-			receiveIDType = "open_id"
-		} else {
-			receiveIDType = "user_id"
-		}
-	}
 	if p.cfg.ReceiveIDType != "" {
 		receiveIDType = p.cfg.ReceiveIDType
 	}
-	if receiveID == "" {
-		err := fmt.Errorf("feishu: no receive_id (approval_user_id, chat_id, or confirmer_ids)")
+	// I-008 多审批人：优先 ConfirmerIDs，否则 ApprovalUserIDs，否则单 ApprovalUserID/ChatID
+	var receiveIDs []string
+	if in.Options != nil && len(in.Options.ConfirmerIDs) > 0 {
+		receiveIDs = in.Options.ConfirmerIDs
+	}
+	if len(receiveIDs) == 0 {
+		receiveIDs = p.cfg.ApprovalUserIDs
+	}
+	if len(receiveIDs) == 0 && p.cfg.ApprovalUserID != "" {
+		receiveIDs = []string{p.cfg.ApprovalUserID}
+	}
+	if len(receiveIDs) == 0 && p.cfg.ChatID != "" {
+		receiveIDs = []string{p.cfg.ChatID}
+		receiveIDType = "chat_id"
+	}
+	if len(receiveIDs) == 0 {
+		err := fmt.Errorf("feishu: no receive_id (approval_user_id(s), chat_id, or confirmer_ids)")
 		fmt.Fprintf(os.Stderr, "[diting] 飞书投递: %v\n", err)
 		return err
+	}
+	if receiveIDs[0] != "" && strings.HasPrefix(receiveIDs[0], "ou_") && receiveIDType == "user_id" {
+		receiveIDType = "open_id"
 	}
 
 	maxAttempts := p.cfg.RetryMaxAttempts
@@ -101,30 +98,44 @@ func (p *Provider) Deliver(ctx context.Context, in *delivery.DeliverInput) error
 	if initialBackoff <= 0 {
 		initialBackoff = 1
 	}
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		if p.cfg.UseCardDelivery {
-			err = p.sendCard(ctx, token, receiveIDType, receiveID, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
-		} else {
-			err = p.sendMessage(ctx, token, receiveIDType, receiveID, body)
+	policyAll := p.cfg.ApprovalPolicy == "all"
+	var lastErr error
+	for _, rid := range receiveIDs {
+		if rid == "" {
+			continue
 		}
-		if err == nil {
-			break
+		idType := receiveIDType
+		if strings.HasPrefix(rid, "ou_") {
+			idType = "open_id"
+		} else if rid == p.cfg.ChatID {
+			idType = "chat_id"
 		}
-		if attempt < maxAttempts-1 {
-			backoff := time.Duration(initialBackoff<<uint(attempt)) * time.Second
-			fmt.Fprintf(os.Stderr, "[diting] 飞书投递重试 %d/%d after %v: %v\n", attempt+1, maxAttempts, backoff, err)
-			time.Sleep(backoff)
+		approveURL := fmt.Sprintf("%s/cheq/approve?id=%s&approved=true", baseURL, in.Object.ID)
+		rejectURL := fmt.Sprintf("%s/cheq/approve?id=%s&approved=false", baseURL, in.Object.ID)
+		if policyAll {
+			approveURL += "&by=" + url.QueryEscape(rid)
+			rejectURL += "&by=" + url.QueryEscape(rid)
+		}
+		body := fmt.Sprintf("待确认请求\nTraceID: %s\nID: %s\n摘要: %s\n\n批准: %s\n拒绝: %s",
+			in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
+		for attempt := 0; attempt < maxAttempts; attempt++ {
+			if p.cfg.UseCardDelivery {
+				lastErr = p.sendCard(ctx, token, idType, rid, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
+			} else {
+				lastErr = p.sendMessage(ctx, token, idType, rid, body)
+			}
+			if lastErr == nil {
+				break
+			}
+			if attempt < maxAttempts-1 {
+				time.Sleep(time.Duration(initialBackoff<<uint(attempt)) * time.Second)
+			}
+		}
+		if lastErr != nil && strings.Contains(lastErr.Error(), "open_id cross app") && p.cfg.ChatID != "" {
+			lastErr = p.sendMessage(ctx, token, "chat_id", p.cfg.ChatID, body)
 		}
 	}
-	if err != nil && strings.Contains(err.Error(), "open_id cross app") && p.cfg.ChatID != "" {
-		fmt.Fprintf(os.Stderr, "[diting] 飞书投递: open_id cross app，回退到 chat_id\n")
-		if p.cfg.UseCardDelivery {
-			err = p.sendCard(ctx, token, "chat_id", p.cfg.ChatID, in.Object.TraceID, in.Object.ID, summary, approveURL, rejectURL)
-		} else {
-			err = p.sendMessage(ctx, token, "chat_id", p.cfg.ChatID, body)
-		}
-	}
-	return err
+	return lastErr
 }
 
 // sendCard 发送交互卡片（批准/拒绝按钮），按钮 value 为 {"request_id":"<cheq_id>","action":"approve"|"reject"}，供长连接或 HTTP 回调解析。

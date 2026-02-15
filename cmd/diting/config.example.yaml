@@ -21,6 +21,9 @@ delivery:
     app_id: ""
     enabled: true
     approval_user_id: ""
+    # I-008 多审批人：列表与 approval_user_id 二选一（或 .env DITING_FEISHU_APPROVAL_USER_ID）
+    # approval_user_ids: []
+    # approval_policy: "any"  # any=任一通过即放行，all=全部通过才放行
     receive_id_type: ""
     approval_timeout_minutes: 5
     use_message_reply: true

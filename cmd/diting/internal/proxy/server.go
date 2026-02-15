@@ -134,7 +134,8 @@ func (s *Server) cheqApproveHandler() http.HandlerFunc {
 			return
 		}
 		approved := approvedStr == "true" || approvedStr == "1" || approvedStr == "yes"
-		err := s.cheq.Submit(r.Context(), id, approved)
+		by := r.URL.Query().Get("by") // I-008 全部通过时标识谁批准
+		err := s.cheq.Submit(r.Context(), id, approved, by)
 		if err != nil {
 			if err == cheq.ErrNotFound {
 				w.WriteHeader(http.StatusNotFound)
@@ -248,7 +249,7 @@ func (s *Server) feishuCardHandler() http.HandlerFunc {
 			return
 		}
 		approved := actionType == "approve"
-		err := s.cheq.Submit(r.Context(), requestID, approved)
+		err := s.cheq.Submit(r.Context(), requestID, approved, "")
 		if err != nil {
 			if err == cheq.ErrNotFound || err == cheq.ErrExpired || err == cheq.ErrAlreadyProcessed {
 				w.Header().Set("Content-Type", "application/json")

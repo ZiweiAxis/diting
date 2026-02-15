@@ -109,7 +109,7 @@ func (p *pipeline) ServeHTTP(w http.ResponseWriter, r *http.Request, reqCtx *mod
 			return
 		}
 		if !p.reviewRequiresApproval {
-			_ = p.cheq.Submit(ctx, obj.ID, true)
+			_ = p.cheq.Submit(ctx, obj.ID, true, "")
 			rp.ServeHTTP(wrap, r)
 			p.appendEvidenceWithCHEQ(ctx, traceID, reqCtx, "approved", decision.PolicyRuleID, decision.DecisionReason, string(models.ConfirmationStatusApproved), obj.ConfirmerIDs)
 			break

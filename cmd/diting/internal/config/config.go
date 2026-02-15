@@ -69,11 +69,13 @@ type DeliveryConfig struct {
 
 // FeishuConfig 飞书应用配置；敏感项从 env 覆盖。
 type FeishuConfig struct {
-	AppID                  string `yaml:"app_id"`
-	AppSecret              string `yaml:"app_secret"` // 实际从 DITING_FEISHU_APP_SECRET 覆盖
-	Enabled                bool   `yaml:"enabled"`
-	ApprovalUserID         string `yaml:"approval_user_id"`          // 审批人 ID（见 ReceiveIDType）
-	ReceiveIDType          string `yaml:"receive_id_type"`            // open_id（默认）或 user_id，避免 open_id cross app
+	AppID                  string   `yaml:"app_id"`
+	AppSecret              string   `yaml:"app_secret"` // 实际从 DITING_FEISHU_APP_SECRET 覆盖
+	Enabled                bool     `yaml:"enabled"`
+	ApprovalUserID         string   `yaml:"approval_user_id"`           // 单审批人（兼容）；与 ApprovalUserIDs 二选一
+	ApprovalUserIDs        []string `yaml:"approval_user_ids"`          // 多审批人列表（I-008）；空时用 approval_user_id 转成单元素
+	ApprovalPolicy         string   `yaml:"approval_policy"`            // any（任一通过）或 all（全部通过）；默认 any
+	ReceiveIDType          string   `yaml:"receive_id_type"`           // open_id（默认）或 user_id，避免 open_id cross app
 	ApprovalTimeoutMinutes int    `yaml:"approval_timeout_minutes"` // 审批超时（分钟）
 	UseMessageReply        bool   `yaml:"use_message_reply"`
 	PollIntervalSeconds    int    `yaml:"poll_interval_seconds"`

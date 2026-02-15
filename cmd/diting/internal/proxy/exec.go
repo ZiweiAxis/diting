@@ -100,7 +100,7 @@ func (p *pipeline) ExecEvaluate(ctx context.Context, traceID string, req *models
 			return nil, err
 		}
 		if !p.reviewRequiresApproval {
-			_ = p.cheq.Submit(ctx, obj.ID, true)
+			_ = p.cheq.Submit(ctx, obj.ID, true, "")
 			p.appendEvidenceWithCHEQ(ctx, traceID, req, "approved", decision.PolicyRuleID, decision.DecisionReason, string(models.ConfirmationStatusApproved), obj.ConfirmerIDs)
 			return &ExecAuthResponse{
 				Decision:           "allow",
@@ -225,7 +225,7 @@ func (p *pipeline) ExecEvaluateNonBlocking(ctx context.Context, traceID string, 
 			return nil, nil, err
 		}
 		if !p.reviewRequiresApproval {
-			_ = p.cheq.Submit(ctx, obj.ID, true)
+			_ = p.cheq.Submit(ctx, obj.ID, true, "")
 			p.appendEvidenceWithCHEQ(ctx, traceID, req, "approved", decision.PolicyRuleID, decision.DecisionReason, string(models.ConfirmationStatusApproved), obj.ConfirmerIDs)
 			return &ExecAuthResponse{
 				Decision: "allow", PolicyRuleID: decision.PolicyRuleID, Reason: decision.DecisionReason,
