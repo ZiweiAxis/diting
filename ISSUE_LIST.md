@@ -63,20 +63,20 @@
 
 ## 七、紫微私有链与 DID（扩展）
 
-| ID | 标题 | 优先级 | 说明 |
-|----|------|--------|------|
-| I-016 | 私有链子模块规划与接口设计 | P2 | 紫微技术方案将私有链归属谛听；在 diting 内新增 pkg/chain 或 internal/chain，定义 DID 注册/查询与审计存证/验真 API，与 ziwei 技术方案 3.6 一致。设计见 `_bmad-output/planning-artifacts/chain-submodule-design-I016.md`。 | **In Progress**（2026-02-13 设计完成） |
-| I-017 | 实现最小私有链 + DID/存证 API（一期） | P2 | 链抽象层 + 最小可用链（如日志+Merkle），暴露 POST/GET /chain/did/*、POST/GET /chain/audit/*；依赖 I-016。拆为 **Epic 10**，Stories 10.1～10.6 见 `_bmad-output/planning-artifacts/epics.md` 与 `_bmad-output/implementation-artifacts/10-*.md`。 |
-| I-018 | 天枢对接：注册/心跳调用谛听 DID 接口 | P2 | 天枢（tianshu）在智能体注册与心跳流程中调用谛听链上 DID 接口；依赖 I-017。 |
+| ID | 标题 | 优先级 | 说明 | 状态 |
+|----|------|--------|------|------|
+| I-016 | 私有链子模块规划与接口设计 | P2 | 紫微技术方案将私有链归属谛听；在 diting 内新增 pkg/chain 或 internal/chain，定义 DID 注册/查询与审计存证/验真 API，与 ziwei 技术方案 3.6 一致。设计见 `_bmad-output/planning-artifacts/chain-submodule-design-I016.md`。 | **Done**（2026-02-13 设计完成并实现） |
+| I-017 | 实现最小私有链 + DID/存证 API（一期） | P2 | 链抽象层 + 最小可用链（如日志+Merkle），暴露 POST/GET /chain/did/*、POST/GET /chain/audit/*；依赖 I-016。拆为 **Epic 10**，Stories 10.1～10.6 见 `_bmad-output/planning-artifacts/epics.md` 与 `_bmad-output/implementation-artifacts/10-*.md`。 | **Done**（2026-02-13 Epic 10 完成；config.chain-run.yaml、/chain/health 可用） |
+| I-018 | 天枢对接：注册/心跳调用谛听 DID 接口 | P2 | 天枢（tianshu）在智能体注册与心跳流程中调用谛听链上 DID 接口；依赖 I-017。 | **Done**（2026-02-13：E-P7 联调已通过；联调约定见 ziwei/docs/open/technical/E-P7-DID联调验证.md） |
 
 ---
 
 ## 八、测试与质量
 
-| ID | 标题 | 优先级 | 说明 |
-|----|------|--------|------|
-| I-019 | 关键包单测覆盖与 CI 回归 | P2 | policy、cheq、audit、proxy pipeline 等核心包保持或补充单测；`go test ./internal/...` 纳入 CI。 |
-| I-020 | E2E 与 15 分钟演示脚本可重复执行 | P2 | 端到端脚本与文档在干净环境下可重复跑通，耗时与结果可验证。 |
+| ID | 标题 | 优先级 | 说明 | 状态 |
+|----|------|--------|------|------|
+| I-019 | 关键包单测覆盖与 CI 回归 | P2 | policy、cheq、audit、proxy pipeline 等核心包保持或补充单测；`go test ./internal/...` 纳入 CI。 | **Done**（2026-02-15：已补 policy/audit/cheq 单测，Makefile `make test`，.github/workflows/test.yml） |
+| I-020 | E2E 与 15 分钟演示脚本可重复执行 | P2 | 端到端脚本与文档在干净环境下可重复跑通，耗时与结果可验证。 | **Done**（2026-02-15：verify_exec.sh 可重复、test.sh 端口 8080+PROXY_PORT、docs/E2E与演示可重复执行说明.md） |
 
 ---
 

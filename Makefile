@@ -3,12 +3,16 @@
 DITING_DIR := cmd/diting
 BINARY := $(DITING_DIR)/bin/diting
 
-.PHONY: build run watch watch-entr clean docker-diting
+.PHONY: build run test watch watch-entr clean docker-diting
 build:
 	cd $(DITING_DIR) && go build -o bin/diting ./cmd/diting_allinone
 
 run: build
 	cd $(DITING_DIR) && ./bin/diting
+
+# 单测：policy、cheq、audit、proxy、chain 等核心包；CI 可执行 make test
+test:
+	cd $(DITING_DIR) && go test ./internal/... ./pkg/... -count=1
 
 # 清理 diting 构建产物（bin/ 及 cmd/diting 根目录残留）
 clean:
