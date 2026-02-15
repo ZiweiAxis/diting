@@ -84,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/auth/exec", s.execAuthHandler())
 	mux.HandleFunc("/auth/sandbox-profile", s.sandboxProfileHandler())
 	mux.HandleFunc("/auth/stream", s.authStreamHandler())
+	mux.HandleFunc("/init_permission", s.initPermissionHandler())
 	if s.chainHandler != nil {
 		mux.Handle("/chain/", http.StripPrefix("/chain", s.chainHandler))
 	}
@@ -217,6 +218,32 @@ func (s *Server) execAuthHandler() http.HandlerFunc {
 			w.WriteHeader(http.StatusForbidden)
 		}
 		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// initPermissionHandler 处理天枢「Agent 注册完成」通知：POST /init_permission，体为 agent_id、owner_id。
+// 占位实现：返回 200 OK，便于天枢配置 DITING_INIT_PERMISSION_URL；默认策略由全局 policy 规则文件生效。
+func (s *Server) initPermissionHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var body struct {
+			AgentID string `json:"agent_id"`
+			OwnerID string `json:"owner_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if body.AgentID != "" {
+			// 可选：记录或下发默认策略；当前仅占位
+			_ = body.OwnerID
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}
 }
 
